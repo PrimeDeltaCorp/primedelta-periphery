@@ -1,0 +1,44 @@
+{
+  "lib/base64": {
+    "tag": {
+      "name": "v1.1.0",
+      "rev": "dcbf852ba545b3d15de0ac0ef88dce934c090c8e"
+    }
+  },
+  "lib/dclex-blockchain": {
+    "branch": {
+      "name": "main",
+      "rev": "971ea05006922f0e299047f9116fc40f6f4fc015"
+    }
+  },
+  "lib/dclex-protocol": {
+    "branch": {
+      "name": "main",
+      "rev": "e136d106b04abd7ea647bb468e96656ac2565978"
+    }
+  },
+  "lib/forge-std": {
+    "rev": "8ba9031ffcbe25aa0d1224d3ca263a995026e477"
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "acd4ff74de833399287ed6b31b4debf6b2b35527"
+  },
+  "lib/pyth-crosschain": {
+    "rev": "5a681d74bca9f54689419f6c636b448a056d6f82"
+  },
+  "lib/pyth-sdk-solidity": {
+    "rev": "c24b3e0173a5715c875ae035c20e063cb900f481"
+  },
+  "lib/v3-core": {
+    "branch": {
+      "name": "0.8",
+      "rev": "ea6c32ec32f8ccd5063bb6dfed724d7e472908a4"
+    }
+  },
+  "lib/v3-periphery": {
+    "branch": {
+      "name": "0.8",
+      "rev": "52d9f238254b54f0036d8713f38cd7168e02ba84"
+    }
+  }
+}

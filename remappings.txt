@@ -1,0 +1,3 @@
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+dclex-blockchain/=lib/dclex-blockchain/
+dclex-protocol/=lib/dclex-protocol/

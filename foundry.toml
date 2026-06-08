@@ -1,0 +1,83 @@
+# Default profile — compiles everything.
+# via_ir = true enables the IR pipeline, required for complex scripts with many local variables
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+evm_version = "shanghai"
+via_ir = false
+optimizer_runs = 200
+remappings = [
+    "@uniswap/v3-core/=lib/v3-core/",
+    "@uniswap/v3-periphery/=lib/v3-periphery/",
+    "@dclex-protocol/=lib/dclex-protocol/src/",
+    "dclex-protocol/=lib/dclex-protocol/",
+    "dclex-blockchain/=lib/dclex-blockchain/",
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "forge-std/=lib/forge-std/src/",
+    "base64-sol/=lib/base64/",
+]
+
+# SeedLiquidity + PrintInitCalldata require via_ir due to stack depth —
+# skip in default profile; run them with `forge build --via-ir` if needed.
+skip = [
+    "script/SeedLiquidity.s.sol",
+    "script/PrintInitCalldata.s.sol",
+]
+
+# Pool deployment — skips DclexRouter and router-related scripts.
+[profile.pool-deploy]
+src = "src"
+out = "out"
+libs = ["lib"]
+evm_version = "shanghai"
+via_ir = false
+optimizer_runs = 200
+remappings = [
+    "@uniswap/v3-core/=lib/v3-core/",
+    "@uniswap/v3-periphery/=lib/v3-periphery/",
+    "@dclex-protocol/=lib/dclex-protocol/src/",
+    "dclex-protocol/=lib/dclex-protocol/",
+    "dclex-blockchain/=lib/dclex-blockchain/",
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "forge-std/=lib/forge-std/src/",
+    "base64-sol/=lib/base64/",
+]
+skip = [
+    "src/DclexRouter.sol",
+    "script/HelperConfig.s.sol",
+    "script/InitializePool.s.sol",
+    "script/DeployDclexRouterWithPools.s.sol",
+    "script/RedeployRouter.s.sol",
+]
+
+# Router deployment — skips pool-init scripts.
+[profile.router-deploy]
+src = "src"
+out = "out"
+libs = ["lib"]
+evm_version = "shanghai"
+via_ir = false
+optimizer_runs = 200
+remappings = [
+    "@uniswap/v3-core/=lib/v3-core/",
+    "@uniswap/v3-periphery/=lib/v3-periphery/",
+    "@dclex-protocol/=lib/dclex-protocol/src/",
+    "dclex-protocol/=lib/dclex-protocol/",
+    "dclex-blockchain/=lib/dclex-blockchain/",
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "forge-std/=lib/forge-std/src/",
+    "base64-sol/=lib/base64/",
+]
+skip = [
+    "script/HelperConfig.s.sol",
+    "script/InitializePool.s.sol",
+    "script/DeployDclexRouterWithPools.s.sol",
+]
+
+[rpc_endpoints]
+local = "http://127.0.0.1:8545"
+sepolia = "${SEPOLIA_RPC_URL}"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }

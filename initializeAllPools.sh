@@ -1,0 +1,1 @@
+jq 'keys' pythPriceFeedIds.json | jq -r .[] | xargs -I'{}' forge script --ffi script/InitializePool.s.sol --private-key $PRIVATE_KEY --rpc-url $SEPOLIA_RPC_URL --sig "run(address,address,string[],uint256,uint256)" 0x364BF7E882D6808c03c23379477f3dcD66509916 0x88aE83F96380528674c7abBd06D16f77c58462F4 [{}] 1000000000000000000 1000000000
