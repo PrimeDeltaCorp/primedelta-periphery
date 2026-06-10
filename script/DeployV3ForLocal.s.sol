@@ -4,6 +4,8 @@ pragma solidity ^0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 import {SwapRouter} from "@uniswap/v3-periphery/contracts/SwapRouter.sol";
 import {Quoter} from "@uniswap/v3-periphery/contracts/lens/Quoter.sol";
+import {PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
+import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 import {WDEL} from "../src/WDEL.sol";
 import {DclexV3Factory} from "../src/DclexV3Factory.sol";
 import {DclexPositionManager} from "../src/DclexPositionManager.sol";
@@ -22,6 +24,11 @@ contract DeployV3ForLocal is Script {
             address v3PositionManager
         )
     {
+        require(
+            PoolAddress.POOL_INIT_CODE_HASH == keccak256(type(UniswapV3Pool).creationCode),
+            "POOL_INIT_CODE_HASH stale vs UniswapV3Pool.creationCode for current compile settings"
+        );
+
         vm.startBroadcast();
 
         WDEL wethMock = new WDEL();
