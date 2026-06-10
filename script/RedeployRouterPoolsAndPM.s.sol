@@ -14,6 +14,8 @@ import {DclexRouter} from "src/DclexRouter.sol";
 import {DclexPositionManager} from "src/DclexPositionManager.sol";
 import {FIOraclePoolBatchInitializer} from "src/FIOraclePoolBatchInitializer.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
+import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 
 /// @notice Redeploy DclexRouter + DclexPositionManager + FIOracle + 44 DclexPools
 ///         after the dclex-protocol#10 + dclex-periphery#18 PRs landed.
@@ -145,20 +147,34 @@ contract RedeployRouterPoolsAndPM is Script {
     }
 
     function run() external {
+        require(
+            PoolAddress.POOL_INIT_CODE_HASH == keccak256(type(UniswapV3Pool).creationCode),
+            "POOL_INIT_CODE_HASH stale"
+        );
+
         EnvCfg memory cfg = _loadEnv();
-        uint256 deployerKey     = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        uint256 adminKey        = vm.envUint("ADMIN_PRIVATE_KEY");
-        uint256 masterAdminKey  = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
-        address deployer        = vm.addr(deployerKey);
-        address adminAddr       = vm.addr(adminKey);
-        require(adminAddr == cfg.admin, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
+        uint256 deployerKey    = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        uint256 adminKey       = vm.envUint("ADMIN_PRIVATE_KEY");
+        uint256 masterAdminKey = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
+        require(vm.addr(adminKey) == cfg.admin, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
 
         StockInfo[] memory stocks = getAllStocks();
+        Phase1Output memory ph = _phase1Deploy(cfg, deployerKey, stocks);
+        _phase2Configure(ph, cfg, stocks, adminKey, masterAdminKey);
+        _phase3Initialize(ph, cfg, stocks, adminKey, masterAdminKey);
+        _phase4HandoffOracle(ph, cfg, deployerKey);
+        _printSummary(ph, stocks);
+    }
 
-        Phase1Output memory ph;
+    // ============ Phase 1 (deployer): new FIOracle, router, PM, 44 pools, batch initializer ============
+    function _phase1Deploy(
+        EnvCfg memory cfg,
+        uint256 deployerKey,
+        StockInfo[] memory stocks
+    ) internal returns (Phase1Output memory ph) {
+        address deployer = vm.addr(deployerKey);
         ph.pools = new address[](stocks.length);
 
-        // ============ Phase 1 (deployer): new FIOracle, router, PM, 44 pools, batch initializer ============
         vm.startBroadcast(deployerKey);
         ph.fiOracle = new FIOracle(deployer, deployer);
         ph.fiOracle.setPricePerUpdate(INITIAL_UPDATE_FEE);
@@ -174,6 +190,18 @@ contract RedeployRouterPoolsAndPM is Script {
         ph.batchInit = new FIOraclePoolBatchInitializer();
         console.log("BatchInitializer:", address(ph.batchInit));
 
+        _deployPools(ph, cfg, stocks);
+
+        // Hand router ownership to admin so admin can configure pools/V3 in phase 2.
+        ph.router.transferOwnership(cfg.admin);
+        vm.stopBroadcast();
+    }
+
+    function _deployPools(
+        Phase1Output memory ph,
+        EnvCfg memory cfg,
+        StockInfo[] memory stocks
+    ) internal {
         for (uint256 i = 0; i < stocks.length; i++) {
             address stockAddr = Factory(cfg.factory).stocks(stocks[i].symbol);
             require(stockAddr != address(0), string.concat("stock not found: ", stocks[i].symbol));
@@ -189,21 +217,25 @@ contract RedeployRouterPoolsAndPM is Script {
             );
             ph.pools[i] = address(pool);
         }
-        // Hand router ownership to admin so admin can configure pools/V3 in phase 2.
-        ph.router.transferOwnership(cfg.admin);
-        vm.stopBroadcast();
+    }
 
-        // ============ Phase 2 (admin): DIDs, pool wiring, V3 pool registry, fund batch initializer ============
+    // ============ Phase 2 (admin): DIDs, pool wiring, V3 pool registry, fund batch initializer ============
+    function _phase2Configure(
+        Phase1Output memory ph,
+        EnvCfg memory cfg,
+        StockInfo[] memory stocks,
+        uint256 adminKey,
+        uint256 masterAdminKey
+    ) internal {
         DigitalIdentity did = DigitalIdentity(cfg.did);
         Factory factory = Factory(cfg.factory);
+
         vm.startBroadcast(adminKey);
 
-        // DIDs for router, PM, batch initializer
         did.mintAdmin(address(ph.router), 2, bytes32(0));
         did.mintAdmin(address(ph.npm), 2, bytes32(0));
         did.mintAdmin(address(ph.batchInit), 2, bytes32(0));
 
-        // Per-pool: DID, register on router
         for (uint256 i = 0; i < stocks.length; i++) {
             did.mintAdmin(ph.pools[i], 2, bytes32(0));
         }
@@ -213,12 +245,8 @@ contract RedeployRouterPoolsAndPM is Script {
         }
 
         // V3 pools (AMMT1, AMMT2, WDEL). AMMT tokens are added manually
-        // post-deploy on testnet/prod (feedback_amm_tokens_manual) — skip
-        // registration when env vars come in as address(0) so the same
-        // script runs against any environment without modification.
-        // addPool reverts on either token==address(0) or pool==address(0),
-        // so the guard must cover BOTH halves of the pair; partial config
-        // (one set, the other not) is treated as "skip".
+        // post-deploy on testnet/prod — skip registration when env vars
+        // come in as address(0).
         if (cfg.ammt1Stock != address(0) && cfg.ammt1V3Pool != address(0)) {
             ph.router.addPool(cfg.ammt1Stock, DclexRouter.PoolType.V3, cfg.ammt1V3Pool, V3_FEE_TIER);
         }
@@ -227,18 +255,25 @@ contract RedeployRouterPoolsAndPM is Script {
         }
         ph.router.addPool(cfg.wdel, DclexRouter.PoolType.V3, cfg.wdelV3Pool, V3_FEE_TIER);
 
-        // Mint bulk dUSD to batch initializer (covers DUSD_AMOUNT * 44 pools)
         factory.forceMintStablecoin("dUSD", address(ph.batchInit), DUSD_AMOUNT * stocks.length);
         vm.stopBroadcast();
 
-        // Phase 2b (master admin): grant DEFAULT_ADMIN_ROLE on Factory to the batch initializer.
-        // Admin holds DEFAULT_ADMIN_ROLE but its grantor is MASTER_ADMIN_ROLE — only master admin can grant.
-        bytes32 DEFAULT_ADMIN_ROLE = 0x00;
+        // Master admin grants DEFAULT_ADMIN_ROLE on Factory to batch initializer.
         vm.startBroadcast(masterAdminKey);
-        factory.grantRole(DEFAULT_ADMIN_ROLE, address(ph.batchInit));
+        factory.grantRole(0x00, address(ph.batchInit));
         vm.stopBroadcast();
+    }
 
-        // ============ Phase 3 (admin): build signed price payloads, batch init pools ============
+    // ============ Phase 3 (admin): build signed price payloads, batch init pools ============
+    function _phase3Initialize(
+        Phase1Output memory ph,
+        EnvCfg memory cfg,
+        StockInfo[] memory stocks,
+        uint256 adminKey,
+        uint256 masterAdminKey
+    ) internal {
+        Factory factory = Factory(cfg.factory);
+
         // Pin block.timestamp once so every signed publishTime is <60s when the single batch tx mines.
         uint64 publishTime = uint64(block.timestamp);
         vm.warp(publishTime);
@@ -267,20 +302,28 @@ contract RedeployRouterPoolsAndPM is Script {
         );
         vm.stopBroadcast();
 
-        // Phase 3b (master admin): revoke the temporary admin role from the batch initializer.
+        // Master admin revokes the temporary admin role.
         vm.startBroadcast(masterAdminKey);
-        factory.revokeRole(DEFAULT_ADMIN_ROLE, address(ph.batchInit));
+        factory.revokeRole(0x00, address(ph.batchInit));
         vm.stopBroadcast();
+    }
 
-        // ============ Phase 4 (deployer): hand FIOracle to production roles ============
+    // ============ Phase 4 (deployer): hand FIOracle to production roles ============
+    function _phase4HandoffOracle(
+        Phase1Output memory ph,
+        EnvCfg memory cfg,
+        uint256 deployerKey
+    ) internal {
+        address deployer = vm.addr(deployerKey);
         vm.startBroadcast(deployerKey);
         ph.fiOracle.setTrustedSigner(cfg.backendSigner);
         ph.fiOracle.grantRole(0x00, cfg.admin);
         ph.fiOracle.setFeeRecipient(cfg.admin);
         ph.fiOracle.renounceRole(0x00, deployer);
         vm.stopBroadcast();
+    }
 
-        // ============ Output ============
+    function _printSummary(Phase1Output memory ph, StockInfo[] memory stocks) internal view {
         console.log("");
         console.log("=== REDEPLOY COMPLETE ===");
         console.log("FIOracle:            ", address(ph.fiOracle));

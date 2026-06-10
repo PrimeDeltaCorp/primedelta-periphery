@@ -1,10 +1,10 @@
-# Default profile — compiles everything.
-# via_ir = true enables the IR pipeline, required for complex scripts with many local variables
+# Changing evm_version / optimizer_runs / via_ir / bytecodeHash invalidates
+# PoolAddress.POOL_INIT_CODE_HASH — re-run test/PoolInitCodeHash.t.sol.
 [profile.default]
 src = "src"
 out = "out"
 libs = ["lib"]
-evm_version = "shanghai"
+evm_version = "cancun"
 via_ir = false
 optimizer_runs = 200
 remappings = [
@@ -30,7 +30,7 @@ skip = [
 src = "src"
 out = "out"
 libs = ["lib"]
-evm_version = "shanghai"
+evm_version = "cancun"
 via_ir = false
 optimizer_runs = 200
 remappings = [
@@ -56,7 +56,7 @@ skip = [
 src = "src"
 out = "out"
 libs = ["lib"]
-evm_version = "shanghai"
+evm_version = "cancun"
 via_ir = false
 optimizer_runs = 200
 remappings = [

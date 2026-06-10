@@ -5,6 +5,8 @@ import {Script, console} from "forge-std/Script.sol";
 import {SwapRouter} from "@uniswap/v3-periphery/contracts/SwapRouter.sol";
 import {Quoter} from "@uniswap/v3-periphery/contracts/lens/Quoter.sol";
 import {TickLens} from "@uniswap/v3-periphery/contracts/lens/TickLens.sol";
+import {PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
+import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 import {WDEL} from "../src/WDEL.sol";
 import {DclexV3Factory} from "../src/DclexV3Factory.sol";
 import {DclexPositionManager} from "../src/DclexPositionManager.sol";
@@ -27,6 +29,11 @@ contract DeployV3Production is Script {
     /// @notice Deploy V3 infrastructure only (no DclexRouter — that's in DeployDclexRouterWithPools)
     /// @param did DigitalIdentity contract address (for DclexPositionManager DID gating)
     function run(address did) external returns (V3Contracts memory result) {
+        require(
+            PoolAddress.POOL_INIT_CODE_HASH == keccak256(type(UniswapV3Pool).creationCode),
+            "POOL_INIT_CODE_HASH stale"
+        );
+
         uint256 adminKey = vm.envUint("ADMIN_PRIVATE_KEY");
 
         console.log("\n=== Deploying V3 Infrastructure ===");
