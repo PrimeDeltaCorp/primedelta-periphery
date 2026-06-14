@@ -17,6 +17,7 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
     "base64-sol/=lib/base64/",
 ]
+fs_permissions = [{ access = "read-write", path = "./out" }]
 
 # SeedLiquidity + PrintInitCalldata require via_ir due to stack depth —
 # skip in default profile; run them with `forge build --via-ir` if needed.
