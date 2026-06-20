@@ -84,8 +84,8 @@ contract RedeployFIOracleAndPools is DclexStockList {
                 dusdToken,
                 IPriceOracle(address(fiOracle)),
                 stocks[i].priceFeedId,
-                0.00025 ether,
-                0.009 ether,
+                0.0005 ether,
+                0.0005 ether,
                 0.15 ether, // protocol-fee cut baked at deploy (#256)
                 ADMIN
             );
