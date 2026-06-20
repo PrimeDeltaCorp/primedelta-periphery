@@ -247,21 +247,18 @@ contract DeployMissingPools is Script {
 
             // Deploy pool with deployer. Fee curve is now constructor-bound
             // (setFeeCurve removed per issue #311 — legal requirement).
-            // Raw values match the canonical (baseFee=1%, sens=0.1%) defaults
+            // Raw values match the canonical (baseFee=0.25%, sens=0.2%) defaults
             // used by BatchPoolDeployer:
-            //   feeCurveA = sensitivity / 4 = 0.001 / 4 = 0.00025 ether
-            //   feeCurveB = baseFeeRate - sensitivity = 0.01 - 0.001 = 0.009 ether
-            // (The previous post-deploy `setFeeCurve(0.01, 0.001)` was passing
-            // raw values that did not match these defaults — likely a latent
-            // bug. Aligning the missing-pools script with BatchPoolDeployer.)
+            //   feeCurveA = sensitivity / 4 = 0.002 / 4 = 0.0005 ether
+            //   feeCurveB = baseFeeRate - sensitivity = 0.0025 - 0.002 = 0.0005 ether
             vm.startBroadcast(deployerKey);
             DclexPool dclexPool = new DclexPool(
                 IStock(stockAddress),
                 dusdToken,
                 oracle,
                 priceFeedId,
-                0.00025 ether,
-                0.009 ether,
+                0.0005 ether,
+                0.0005 ether,
                 0.15 ether, // protocol-fee cut, matches BatchPoolDeployer default (#256)
                 ADMIN
             );

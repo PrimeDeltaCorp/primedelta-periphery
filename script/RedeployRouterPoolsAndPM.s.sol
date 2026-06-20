@@ -34,8 +34,8 @@ contract RedeployRouterPoolsAndPM is Script {
     uint256 constant STOCK_AMOUNT        = 10e18;
     uint256 constant DUSD_AMOUNT         = 1_000e6;
     uint24  constant V3_FEE_TIER         = 3000;
-    uint256 constant DEFAULT_FEE_CURVE_A = 0.00025 ether;
-    uint256 constant DEFAULT_FEE_CURVE_B = 0.009 ether;
+    uint256 constant DEFAULT_FEE_CURVE_A = 0.0005 ether;
+    uint256 constant DEFAULT_FEE_CURVE_B = 0.0005 ether;
     // Protocol-fee cut baked at deploy (dclex-infrastructure#256). Matches
     // BatchPoolDeployer.DEFAULT_PROTOCOL_FEE_RATE — keep in sync.
     uint256 constant DEFAULT_PROTOCOL_FEE_RATE = 0.15 ether;

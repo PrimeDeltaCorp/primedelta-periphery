@@ -14,12 +14,13 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 /// @notice Deploys all DclexPools in a single transaction
 /// @dev Requires temporary ownership of router and DEFAULT_ADMIN_ROLE on DigitalIdentity
 contract BatchPoolDeployer {
-    /// @notice Default base fee rate applied to every newly-deployed pool (3%)
+    /// @notice Default base fee rate applied to every newly-deployed pool (0.25%)
     /// @dev When the pool is perfectly balanced the effective fee equals this value
-    uint256 public constant DEFAULT_BASE_FEE_RATE = 0.01 ether;
-    /// @notice Default sensitivity parameter (0.1%) controlling how fast the fee rises
+    uint256 public constant DEFAULT_BASE_FEE_RATE = 0.0025 ether;
+    /// @notice Default sensitivity parameter (0.2%) controlling how fast the fee rises
     /// with pool imbalance. feeCurveA = sensitivity / 4, feeCurveB = baseFeeRate - sensitivity.
-    uint256 public constant DEFAULT_SENSITIVITY = 0.001 ether;
+    /// Yields feeCurveA = feeCurveB = 0.0005 ether (5bps each).
+    uint256 public constant DEFAULT_SENSITIVITY = 0.002 ether;
     /// @notice Default protocol-fee cut of the swap fee, baked at deploy
     /// so it doesn't need a separate post-deploy admin pass per pool
     /// (dclex-infrastructure#256).
