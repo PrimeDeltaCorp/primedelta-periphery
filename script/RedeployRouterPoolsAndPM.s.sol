@@ -139,6 +139,7 @@ contract RedeployRouterPoolsAndPM is Script {
         cfg.v3Factory     = vm.envAddress("V3_FACTORY");
         cfg.wdel          = vm.envAddress("V3_WDEL");
         cfg.descriptor    = vm.envAddress("V3_DESCRIPTOR");
+        require(cfg.descriptor != address(0), "V3_DESCRIPTOR must be set");
         cfg.ammt1Stock    = vm.envAddress("AMMT1_STOCK");
         cfg.ammt1V3Pool   = vm.envAddress("AMMT1_V3_POOL");
         cfg.ammt2Stock    = vm.envAddress("AMMT2_STOCK");
