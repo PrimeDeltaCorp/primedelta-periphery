@@ -9,6 +9,7 @@ import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 import {WDEL} from "../src/WDEL.sol";
 import {DclexV3Factory} from "../src/DclexV3Factory.sol";
 import {DclexPositionManager} from "../src/DclexPositionManager.sol";
+import {DclexNFTDescriptor} from "../src/DclexNFTDescriptor.sol";
 import {IDID} from "dclex-blockchain/contracts/interfaces/IDID.sol";
 
 /// @title DeployV3ForLocal
@@ -47,8 +48,11 @@ contract DeployV3ForLocal is Script {
         v3Quoter = address(quoter);
         console.log("V3 Quoter deployed at:", v3Quoter);
 
+        DclexNFTDescriptor descriptor = new DclexNFTDescriptor(msg.sender, "http://local/nft/positions/");
+        console.log("DclexNFTDescriptor deployed at:", address(descriptor));
+
         DclexPositionManager positionManager = new DclexPositionManager(
-            v3Factory, weth, address(0), IDID(didAddress)
+            v3Factory, weth, address(descriptor), IDID(didAddress)
         );
         v3PositionManager = address(positionManager);
         console.log("DclexPositionManager deployed at:", v3PositionManager);
