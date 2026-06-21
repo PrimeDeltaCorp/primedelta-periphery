@@ -10,6 +10,7 @@ import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 import {WDEL} from "../src/WDEL.sol";
 import {DclexV3Factory} from "../src/DclexV3Factory.sol";
 import {DclexPositionManager} from "../src/DclexPositionManager.sol";
+import {DclexNFTDescriptor} from "../src/DclexNFTDescriptor.sol";
 import {IDID} from "dclex-blockchain/contracts/interfaces/IDID.sol";
 
 /// @title DeployV3Production
@@ -24,6 +25,7 @@ contract DeployV3Production is Script {
         address quoter;
         address positionManager;
         address tickLens;
+        address nftDescriptor;
     }
 
     /// @notice Deploy V3 infrastructure only (no DclexRouter — that's in DeployDclexRouterWithPools)
@@ -35,11 +37,18 @@ contract DeployV3Production is Script {
         );
 
         uint256 adminKey = vm.envUint("ADMIN_PRIVATE_KEY");
+        address adminAddr = vm.addr(adminKey);
+        string memory nftBaseURI = vm.envString("NFT_BASE_URI");
 
         console.log("\n=== Deploying V3 Infrastructure ===");
         console.log("DID:", did);
+        console.log("NFT_BASE_URI:", nftBaseURI);
 
         vm.startBroadcast(adminKey);
+
+        DclexNFTDescriptor nftDescriptor = new DclexNFTDescriptor(adminAddr, nftBaseURI);
+        result.nftDescriptor = address(nftDescriptor);
+        console.log("DclexNFTDescriptor:", result.nftDescriptor);
 
         WDEL wdel = new WDEL();
         result.wdel = address(wdel);
@@ -60,7 +69,7 @@ contract DeployV3Production is Script {
         DclexPositionManager npm = new DclexPositionManager(
             result.v3Factory,
             result.wdel,
-            address(0),
+            result.nftDescriptor,
             IDID(did)
         );
         result.positionManager = address(npm);
