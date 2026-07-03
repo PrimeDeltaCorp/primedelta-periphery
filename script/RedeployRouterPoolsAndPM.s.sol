@@ -190,7 +190,7 @@ contract RedeployRouterPoolsAndPM is Script {
         ph.npm = new DclexPositionManager(cfg.v3Factory, cfg.wdel, cfg.descriptor, IDID(cfg.did));
         console.log("DclexPositionManager:", address(ph.npm));
 
-        ph.batchInit = new FIOraclePoolBatchInitializer();
+        ph.batchInit = new FIOraclePoolBatchInitializer(cfg.admin);
         console.log("BatchInitializer:", address(ph.batchInit));
 
         _deployPools(ph, cfg, stocks);

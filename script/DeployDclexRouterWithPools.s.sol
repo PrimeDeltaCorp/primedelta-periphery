@@ -93,7 +93,7 @@ contract DeployRouterWithPools is Script {
         vm.startBroadcast();
 
         DclexRouter router = new DclexRouter(p.dusdToken);
-        BatchPoolDeployer batch = new BatchPoolDeployer();
+        BatchPoolDeployer batch = new BatchPoolDeployer(msg.sender);
         DigitalIdentity did = DigitalIdentity(address(p.stocksFactory.getDID()));
 
         router.transferOwnership(address(batch));

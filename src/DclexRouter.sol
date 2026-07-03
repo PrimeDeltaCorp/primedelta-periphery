@@ -181,6 +181,13 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
 
         if (poolType == PoolType.DCLEX) {
             if (feeTier != 0) revert DclexRouter__FeeTierNotAllowedForType();
+            if (pool.code.length == 0) revert DclexRouter__PoolMismatch();
+            if (address(DclexPool(pool).stockToken()) != token) {
+                revert DclexRouter__PoolMismatch();
+            }
+            if (address(DclexPool(pool).stablecoinToken()) != address(stablecoin)) {
+                revert DclexRouter__PoolMismatch();
+            }
             _clearStockRegistry(token);
             stockPoolType[token] = PoolType.DCLEX;
             stockToDclexPool[token] = DclexPool(pool);

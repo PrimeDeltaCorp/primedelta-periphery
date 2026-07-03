@@ -95,7 +95,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
         // Phase 3a (admin): deploy batch initializer, mint DIDs for it and
         // each new pool, route stock→newPool, fund the initializer with dUSD.
         vm.startBroadcast(adminKey);
-        FIOraclePoolBatchInitializer batchInit = new FIOraclePoolBatchInitializer();
+        FIOraclePoolBatchInitializer batchInit = new FIOraclePoolBatchInitializer(ADMIN);
         did.mintAdmin(address(batchInit), 2, bytes32(0));
         for (uint256 i = 0; i < stocks.length; i++) {
             did.mintAdmin(newPools[i], 2, bytes32(0));
