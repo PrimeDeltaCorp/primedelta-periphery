@@ -34,13 +34,10 @@ contract BatchPoolDeployer {
         IERC20 dusdToken;
         IPriceOracle oracle;
         address[] stockAddresses;
-        bytes32[] priceFeedIds;
         address finalOwner;
     }
 
     function deployAllPools(DeployParams calldata params) external {
-        require(params.stockAddresses.length == params.priceFeedIds.length, "Length mismatch");
-
         DigitalIdentity digitalIdentity = DigitalIdentity(address(params.factory.getDID()));
         digitalIdentity.mintAdmin(address(params.router), 2, bytes32(0));
 
@@ -54,7 +51,6 @@ contract BatchPoolDeployer {
                 IStock(params.stockAddresses[i]),
                 params.dusdToken,
                 params.oracle,
-                params.priceFeedIds[i],
                 feeCurveA,
                 feeCurveB,
                 DEFAULT_PROTOCOL_FEE_RATE,

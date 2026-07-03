@@ -88,7 +88,7 @@ contract DeployRouterWithPools is Script {
 
     function _executeBatchDeploy(BatchDeployParams memory p) private returns (DclexRouter) {
         DclexProtocolHelperConfig.NetworkConfig memory cfg = p.protocolHelperConfig.getConfig();
-        (address[] memory stocks, bytes32[] memory feeds) = _collectStockData(p.stocksFactory, p.protocolHelperConfig);
+        address[] memory stocks = _collectStockData(p.stocksFactory);
 
         vm.startBroadcast();
 
@@ -100,7 +100,7 @@ contract DeployRouterWithPools is Script {
         did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
         batch.deployAllPools(BatchPoolDeployer.DeployParams(
             router, p.stocksFactory, cfg.dusdToken, cfg.oracle,
-            stocks, feeds, p.admin
+            stocks, p.admin
         ));
         did.revokeRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
 
@@ -109,16 +109,12 @@ contract DeployRouterWithPools is Script {
     }
 
     function _collectStockData(
-        Factory stocksFactory,
-        DclexProtocolHelperConfig helperConfig
-    ) private returns (address[] memory stocks, bytes32[] memory feeds) {
+        Factory stocksFactory
+    ) private returns (address[] memory stocks) {
         uint256 n = stocksFactory.getStocksCount();
         stocks = new address[](n);
-        feeds = new bytes32[](n);
         for (uint256 i = 0; i < n; ++i) {
-            string memory sym = stocksFactory.symbols(i);
-            stocks[i] = stocksFactory.stocks(sym);
-            feeds[i] = helperConfig.getPriceFeedId(sym);
+            stocks[i] = stocksFactory.stocks(stocksFactory.symbols(i));
         }
     }
 
