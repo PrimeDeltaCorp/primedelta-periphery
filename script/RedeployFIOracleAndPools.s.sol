@@ -52,6 +52,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
         _loadEnv();
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         uint256 adminKey    = vm.envUint("ADMIN_PRIVATE_KEY");
+        require(vm.addr(adminKey) == ADMIN, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
         uint256 masterKey   = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
         address deployer    = vm.addr(deployerKey);
 
@@ -95,7 +96,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
         // Phase 3a (admin): deploy batch initializer, mint DIDs for it and
         // each new pool, route stock→newPool, fund the initializer with dUSD.
         vm.startBroadcast(adminKey);
-        FIOraclePoolBatchInitializer batchInit = new FIOraclePoolBatchInitializer();
+        FIOraclePoolBatchInitializer batchInit = new FIOraclePoolBatchInitializer(ADMIN);
         did.mintAdmin(address(batchInit), 2, bytes32(0));
         for (uint256 i = 0; i < stocks.length; i++) {
             did.mintAdmin(newPools[i], 2, bytes32(0));

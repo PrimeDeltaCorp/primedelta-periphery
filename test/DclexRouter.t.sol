@@ -1210,6 +1210,20 @@ contract DclexRouterTest is Test, TestBalance {
         dclexRouter.addPool(address(amznStock), DclexRouter.PoolType.DCLEX, address(amznPool), 3000);
     }
 
+    function testAddDclexPoolRevertsOnStockTokenMismatch() external {
+        // amznPool's stockToken is amznStock — registering it under nvdaStock
+        // must revert (F-008: pool identity is validated at registration).
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__PoolMismatch.selector);
+        dclexRouter.addPool(address(nvdaStock), DclexRouter.PoolType.DCLEX, address(amznPool), 0);
+    }
+
+    function testAddDclexPoolRevertsOnNonContractPool() external {
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__PoolMismatch.selector);
+        dclexRouter.addPool(address(amznStock), DclexRouter.PoolType.DCLEX, address(0xBEEF), 0);
+    }
+
     function testRemovePoolRevertsOnTypeMismatch() external {
         // aaplStock is registered as DCLEX in setUp; declaring V3 on remove
         // must revert.

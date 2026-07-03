@@ -19,6 +19,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///           does not mint dUSD itself; mint to it via
 ///           `Factory.forceMintStablecoin` or a transferFrom).
 contract FIOraclePoolBatchInitializer {
+    /// @notice The only address allowed to call initializeAll — set to the
+    /// admin who holds Factory admin during the deploy window, so the
+    /// transient grant can't be used by another caller.
+    address public immutable authorizedCaller;
+
+    error FIOraclePoolBatchInitializer__Unauthorized();
+    error FIOraclePoolBatchInitializer__ZeroAddress();
+
+    constructor(address _authorizedCaller) {
+        if (_authorizedCaller == address(0)) revert FIOraclePoolBatchInitializer__ZeroAddress();
+        authorizedCaller = _authorizedCaller;
+    }
+
     struct InitParams {
         Factory factory;
         IERC20 dusdToken;
@@ -31,6 +44,7 @@ contract FIOraclePoolBatchInitializer {
     }
 
     function initializeAll(InitParams calldata p) external payable {
+        if (msg.sender != authorizedCaller) revert FIOraclePoolBatchInitializer__Unauthorized();
         require(p.pools.length == p.stockSymbols.length, "len mismatch");
         require(p.pools.length == p.priceUpdateData.length, "len mismatch");
 
