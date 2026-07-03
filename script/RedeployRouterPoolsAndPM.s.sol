@@ -140,10 +140,11 @@ contract RedeployRouterPoolsAndPM is Script {
         cfg.dusd          = vm.envAddress("DCLEX_DUSD");
         cfg.admin         = vm.envAddress("DCLEX_ADMIN");
         cfg.backendSigner = vm.envAddress("DCLEX_BACKEND_SIGNER");
+        require(cfg.backendSigner != address(0), "DCLEX_BACKEND_SIGNER is zero");
         // Optional dedicated FIOracle price signer; defaults to the backend
-        // signer when unset (signers collapsed).
+        // signer when unset (signers collapsed). A non-zero override is
+        // enforced by FIOracle.setTrustedSigner itself.
         cfg.fiOracleSigner = vm.envOr("DCLEX_FIORACLE_SIGNER", cfg.backendSigner);
-        require(cfg.fiOracleSigner != address(0), "DCLEX_BACKEND_SIGNER is zero");
         cfg.v3Factory     = vm.envAddress("V3_FACTORY");
         cfg.wdel          = vm.envAddress("V3_WDEL");
         cfg.descriptor    = vm.envAddress("V3_DESCRIPTOR");

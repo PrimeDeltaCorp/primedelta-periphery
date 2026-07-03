@@ -30,10 +30,11 @@ contract FinalizeFIOracleRedeploy is Script {
         vm.stopBroadcast();
 
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address fiOracleSigner = vm.envOr(
-            "DCLEX_FIORACLE_SIGNER", vm.envAddress("DCLEX_BACKEND_SIGNER")
-        );
-        require(fiOracleSigner != address(0), "DCLEX_BACKEND_SIGNER is zero");
+        address backendSigner = vm.envAddress("DCLEX_BACKEND_SIGNER");
+        require(backendSigner != address(0), "DCLEX_BACKEND_SIGNER is zero");
+        // Optional dedicated price signer; a non-zero override is enforced
+        // by FIOracle.setTrustedSigner itself.
+        address fiOracleSigner = vm.envOr("DCLEX_FIORACLE_SIGNER", backendSigner);
         vm.startBroadcast(deployerKey);
         fiOracle.setTrustedSigner(fiOracleSigner);
         fiOracle.grantRole(0x00, admin);
