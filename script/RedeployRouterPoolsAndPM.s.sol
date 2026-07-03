@@ -23,7 +23,7 @@ import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 ///         Re-mints stocks + dUSD into each new pool with two-sided seed liquidity.
 ///
 /// Env required:
-///   DEPLOYER_PRIVATE_KEY, ADMIN_PRIVATE_KEY
+///   DEPLOYER_PRIVATE_KEY, ADMIN_PRIVATE_KEY, MASTER_ADMIN_PRIVATE_KEY
 ///   DCLEX_FACTORY, DCLEX_DID, DCLEX_DUSD, DCLEX_ADMIN, DCLEX_BACKEND_SIGNER
 ///   DCLEX_FIORACLE_SIGNER (optional — defaults to DCLEX_BACKEND_SIGNER)
 ///   V3_FACTORY, V3_WDEL, V3_DESCRIPTOR
