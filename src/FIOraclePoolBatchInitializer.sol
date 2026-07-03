@@ -25,8 +25,10 @@ contract FIOraclePoolBatchInitializer {
     address public immutable authorizedCaller;
 
     error Unauthorized();
+    error ZeroAddress();
 
     constructor(address _authorizedCaller) {
+        if (_authorizedCaller == address(0)) revert ZeroAddress();
         authorizedCaller = _authorizedCaller;
     }
 

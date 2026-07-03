@@ -52,6 +52,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
         _loadEnv();
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         uint256 adminKey    = vm.envUint("ADMIN_PRIVATE_KEY");
+        require(vm.addr(adminKey) == ADMIN, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
         uint256 masterKey   = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
         address deployer    = vm.addr(deployerKey);
 

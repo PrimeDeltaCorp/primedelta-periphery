@@ -34,8 +34,10 @@ contract BatchPoolDeployer {
     address public immutable deployer;
 
     error Unauthorized();
+    error ZeroAddress();
 
     constructor(address _deployer) {
+        if (_deployer == address(0)) revert ZeroAddress();
         deployer = _deployer;
     }
 

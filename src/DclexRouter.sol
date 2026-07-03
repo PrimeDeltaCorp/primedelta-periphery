@@ -8,6 +8,7 @@ import {
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
+import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
 import {IDclexSwapCallback} from "dclex-protocol/src/IDclexSwapCallback.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
@@ -182,10 +183,16 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
         if (poolType == PoolType.DCLEX) {
             if (feeTier != 0) revert DclexRouter__FeeTierNotAllowedForType();
             if (pool.code.length == 0) revert DclexRouter__PoolMismatch();
-            if (address(DclexPool(pool).stockToken()) != token) {
+            try DclexPool(pool).stockToken() returns (IStock st) {
+                if (address(st) != token) revert DclexRouter__PoolMismatch();
+            } catch {
                 revert DclexRouter__PoolMismatch();
             }
-            if (address(DclexPool(pool).stablecoinToken()) != address(stablecoin)) {
+            try DclexPool(pool).stablecoinToken() returns (IERC20 sc) {
+                if (address(sc) != address(stablecoin)) {
+                    revert DclexRouter__PoolMismatch();
+                }
+            } catch {
                 revert DclexRouter__PoolMismatch();
             }
             _clearStockRegistry(token);
