@@ -324,8 +324,8 @@ contract RedeployRouterPoolsAndPM is Script {
     ) internal {
         address deployer = vm.addr(deployerKey);
         vm.startBroadcast(deployerKey);
-        // Price signer is a DEDICATED key, separate from the voucher
-        // admin (F-004/F-005 key separation).
+        // Hand the price authority to the configured FIOracle signer
+        // (DCLEX_FIORACLE_SIGNER, or the backend signer when unset).
         ph.fiOracle.setTrustedSigner(cfg.fiOracleSigner);
         ph.fiOracle.grantRole(0x00, cfg.admin);
         ph.fiOracle.setFeeRecipient(cfg.admin);

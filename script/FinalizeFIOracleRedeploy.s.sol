@@ -8,8 +8,9 @@ import {FIOracle} from "dclex-protocol/src/FIOracle.sol";
 /// @notice Final step of the FIOracle-only redeploy, run AFTER the pools are
 /// seeded (see PrintInitCalldata.s.sol + cast send). Revokes the batch
 /// initializer's temporary Factory admin role and hands FIOracle to the
-/// dedicated price signer. None of these calls touch the price staleness
-/// path, so a plain forge --broadcast is fine here (unlike seeding).
+/// configured price signer (DCLEX_FIORACLE_SIGNER, or the backend signer
+/// when unset). None of these calls touch the price staleness path, so a
+/// plain forge --broadcast is fine here (unlike seeding).
 ///
 /// Reads addresses from out/redeploy-fioracle-pools.json. Required env:
 /// DEPLOYER_PRIVATE_KEY, MASTER_ADMIN_PRIVATE_KEY, DCLEX_FACTORY, DCLEX_ADMIN,
