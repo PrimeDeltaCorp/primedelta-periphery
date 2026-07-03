@@ -25,6 +25,7 @@ import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 /// Env required:
 ///   DEPLOYER_PRIVATE_KEY, ADMIN_PRIVATE_KEY
 ///   DCLEX_FACTORY, DCLEX_DID, DCLEX_DUSD, DCLEX_ADMIN, DCLEX_BACKEND_SIGNER
+///   DCLEX_FIORACLE_SIGNER (optional — defaults to DCLEX_BACKEND_SIGNER)
 ///   V3_FACTORY, V3_WDEL, V3_DESCRIPTOR
 ///   AMMT1_STOCK, AMMT1_V3_POOL, AMMT2_STOCK, AMMT2_V3_POOL, WDEL_V3_POOL
 contract RedeployRouterPoolsAndPM is Script {
@@ -49,7 +50,8 @@ contract RedeployRouterPoolsAndPM is Script {
         address did;
         address dusd;
         address admin;
-        address backendSigner;
+        address backendSigner;   // Factory/DID/Vault admin — signs vouchers
+        address fiOracleSigner;  // FIOracle trustedSigner — signs prices ONLY
         address v3Factory;
         address wdel;
         address descriptor;
@@ -138,6 +140,9 @@ contract RedeployRouterPoolsAndPM is Script {
         cfg.dusd          = vm.envAddress("DCLEX_DUSD");
         cfg.admin         = vm.envAddress("DCLEX_ADMIN");
         cfg.backendSigner = vm.envAddress("DCLEX_BACKEND_SIGNER");
+        // Optional dedicated FIOracle price signer; defaults to the backend
+        // signer when unset so dev stays collapsed (no separate oracle key).
+        cfg.fiOracleSigner = vm.envOr("DCLEX_FIORACLE_SIGNER", cfg.backendSigner);
         cfg.v3Factory     = vm.envAddress("V3_FACTORY");
         cfg.wdel          = vm.envAddress("V3_WDEL");
         cfg.descriptor    = vm.envAddress("V3_DESCRIPTOR");
@@ -319,7 +324,9 @@ contract RedeployRouterPoolsAndPM is Script {
     ) internal {
         address deployer = vm.addr(deployerKey);
         vm.startBroadcast(deployerKey);
-        ph.fiOracle.setTrustedSigner(cfg.backendSigner);
+        // Price signer is a DEDICATED key, separate from the voucher
+        // admin (F-004/F-005 key separation).
+        ph.fiOracle.setTrustedSigner(cfg.fiOracleSigner);
         ph.fiOracle.grantRole(0x00, cfg.admin);
         ph.fiOracle.setFeeRecipient(cfg.admin);
         ph.fiOracle.renounceRole(0x00, deployer);

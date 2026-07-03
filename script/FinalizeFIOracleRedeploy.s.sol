@@ -8,12 +8,14 @@ import {FIOracle} from "dclex-protocol/src/FIOracle.sol";
 /// @notice Final step of the FIOracle-only redeploy, run AFTER the pools are
 /// seeded (see PrintInitCalldata.s.sol + cast send). Revokes the batch
 /// initializer's temporary Factory admin role and hands FIOracle to the
-/// backend signer. None of these calls touch the price staleness path, so a
-/// plain forge --broadcast is fine here (unlike seeding).
+/// dedicated price signer. None of these calls touch the price staleness
+/// path, so a plain forge --broadcast is fine here (unlike seeding).
 ///
 /// Reads addresses from out/redeploy-fioracle-pools.json. Required env:
 /// DEPLOYER_PRIVATE_KEY, MASTER_ADMIN_PRIVATE_KEY, DCLEX_FACTORY, DCLEX_ADMIN,
-/// DCLEX_BACKEND_SIGNER.
+/// DCLEX_BACKEND_SIGNER. Optional: DCLEX_FIORACLE_SIGNER (defaults to
+/// DCLEX_BACKEND_SIGNER; set it to separate the price signer from the
+/// voucher admin on testnet/prod).
 contract FinalizeFIOracleRedeploy is Script {
     function run() external {
         Factory factory = Factory(vm.envAddress("DCLEX_FACTORY"));
@@ -28,12 +30,14 @@ contract FinalizeFIOracleRedeploy is Script {
 
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(deployerKey);
-        fiOracle.setTrustedSigner(vm.envAddress("DCLEX_BACKEND_SIGNER"));
+        fiOracle.setTrustedSigner(
+            vm.envOr("DCLEX_FIORACLE_SIGNER", vm.envAddress("DCLEX_BACKEND_SIGNER"))
+        );
         fiOracle.grantRole(0x00, admin);
         fiOracle.setFeeRecipient(admin);
         fiOracle.renounceRole(0x00, vm.addr(deployerKey));
         vm.stopBroadcast();
 
-        console.log("FIOracle handed to backend signer; batch initializer role revoked.");
+        console.log("FIOracle handed to price signer; batch initializer role revoked.");
     }
 }

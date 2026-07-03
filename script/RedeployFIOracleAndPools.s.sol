@@ -26,14 +26,14 @@ import {DclexStockList} from "./DclexStockList.sol";
 /// signs a fresh price and seeds all 44 pools in one quick tx.
 ///
 /// Required env: DEPLOYER_PRIVATE_KEY, ADMIN_PRIVATE_KEY, MASTER_ADMIN_PRIVATE_KEY,
-/// DCLEX_ROUTER, DCLEX_FACTORY, DCLEX_DID, DCLEX_ADMIN, DCLEX_BACKEND_SIGNER.
+/// DCLEX_ROUTER, DCLEX_FACTORY, DCLEX_DID, DCLEX_ADMIN.
 /// Optional env: DCLEX_DUSD_SYMBOL (defaults to "dUSD").
+/// The trusted-signer handoff happens in FinalizeFIOracleRedeploy, not here.
 contract RedeployFIOracleAndPools is DclexStockList {
     address payable internal DCLEX_ROUTER;
     address internal FACTORY;
     address internal DID;
     address internal ADMIN;
-    address internal BACKEND_SIGNER;
     string  internal DUSD_SYMBOL;
 
     uint256 constant INITIAL_UPDATE_FEE = 0.001 ether;
@@ -44,7 +44,6 @@ contract RedeployFIOracleAndPools is DclexStockList {
         FACTORY        = vm.envAddress("DCLEX_FACTORY");
         DID            = vm.envAddress("DCLEX_DID");
         ADMIN          = vm.envAddress("DCLEX_ADMIN");
-        BACKEND_SIGNER = vm.envAddress("DCLEX_BACKEND_SIGNER");
         DUSD_SYMBOL    = vm.envOr("DCLEX_DUSD_SYMBOL", string("dUSD"));
     }
 
