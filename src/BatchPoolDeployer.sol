@@ -33,11 +33,11 @@ contract BatchPoolDeployer {
     /// hijacked by another caller during the deploy window.
     address public immutable deployer;
 
-    error Unauthorized();
-    error ZeroAddress();
+    error BatchPoolDeployer__Unauthorized();
+    error BatchPoolDeployer__ZeroAddress();
 
     constructor(address _deployer) {
-        if (_deployer == address(0)) revert ZeroAddress();
+        if (_deployer == address(0)) revert BatchPoolDeployer__ZeroAddress();
         deployer = _deployer;
     }
 
@@ -51,7 +51,7 @@ contract BatchPoolDeployer {
     }
 
     function deployAllPools(DeployParams calldata params) external {
-        if (msg.sender != deployer) revert Unauthorized();
+        if (msg.sender != deployer) revert BatchPoolDeployer__Unauthorized();
         DigitalIdentity digitalIdentity = DigitalIdentity(address(params.factory.getDID()));
         digitalIdentity.mintAdmin(address(params.router), 2, bytes32(0));
 

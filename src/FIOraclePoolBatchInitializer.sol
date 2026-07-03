@@ -24,11 +24,11 @@ contract FIOraclePoolBatchInitializer {
     /// transient grant can't be used by another caller.
     address public immutable authorizedCaller;
 
-    error Unauthorized();
-    error ZeroAddress();
+    error FIOraclePoolBatchInitializer__Unauthorized();
+    error FIOraclePoolBatchInitializer__ZeroAddress();
 
     constructor(address _authorizedCaller) {
-        if (_authorizedCaller == address(0)) revert ZeroAddress();
+        if (_authorizedCaller == address(0)) revert FIOraclePoolBatchInitializer__ZeroAddress();
         authorizedCaller = _authorizedCaller;
     }
 
@@ -44,7 +44,7 @@ contract FIOraclePoolBatchInitializer {
     }
 
     function initializeAll(InitParams calldata p) external payable {
-        if (msg.sender != authorizedCaller) revert Unauthorized();
+        if (msg.sender != authorizedCaller) revert FIOraclePoolBatchInitializer__Unauthorized();
         require(p.pools.length == p.stockSymbols.length, "len mismatch");
         require(p.pools.length == p.priceUpdateData.length, "len mismatch");
 

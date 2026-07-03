@@ -24,7 +24,7 @@ contract BatchDeployerAuthTest is Test {
             finalOwner: address(0)
         });
         vm.prank(attacker);
-        vm.expectRevert(BatchPoolDeployer.Unauthorized.selector);
+        vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__Unauthorized.selector);
         batch.deployAllPools(p);
     }
 
@@ -43,7 +43,7 @@ contract BatchDeployerAuthTest is Test {
                 feePerPool: 0
             });
         vm.prank(attacker);
-        vm.expectRevert(FIOraclePoolBatchInitializer.Unauthorized.selector);
+        vm.expectRevert(FIOraclePoolBatchInitializer.FIOraclePoolBatchInitializer__Unauthorized.selector);
         batchInit.initializeAll(p);
     }
 }
