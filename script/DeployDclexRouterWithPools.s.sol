@@ -90,10 +90,17 @@ contract DeployRouterWithPools is Script {
         DclexProtocolHelperConfig.NetworkConfig memory cfg = p.protocolHelperConfig.getConfig();
         address[] memory stocks = _collectStockData(p.stocksFactory);
 
-        vm.startBroadcast();
+        // BatchPoolDeployer.deployAllPools is locked to an immutable deployer.
+        // It must be the EOA that actually broadcasts the call — derive it
+        // from the master key (also the only account allowed to grantRole on
+        // DID) rather than msg.sender, which can diverge from the broadcaster.
+        uint256 masterKey = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
+        address deployerEOA = vm.addr(masterKey);
+
+        vm.startBroadcast(masterKey);
 
         DclexRouter router = new DclexRouter(p.dusdToken);
-        BatchPoolDeployer batch = new BatchPoolDeployer(msg.sender);
+        BatchPoolDeployer batch = new BatchPoolDeployer(deployerEOA);
         DigitalIdentity did = DigitalIdentity(address(p.stocksFactory.getDID()));
 
         router.transferOwnership(address(batch));
