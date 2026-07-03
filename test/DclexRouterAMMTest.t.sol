@@ -131,9 +131,7 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
         ammStock2 = Stock(stocksFactory.stocks("AMMT2"));
 
         priceOracle = MockPriceOracle(address(protocolConfig.oracle));
-        bytes32 aaplPriceFeedId = dclexProtocolHelperConfig.getPriceFeedId(
-            "AAPL"
-        );
+        bytes32 aaplPriceFeedId = keccak256(abi.encodePacked(address(aaplStock)));
         bytes32 usdcPriceFeedId = dclexProtocolHelperConfig.getPriceFeedId(
             "USDC"
         );

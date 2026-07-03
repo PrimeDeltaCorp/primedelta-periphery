@@ -114,8 +114,8 @@ contract DclexRouterGasTest is Test {
 
 
         priceOracle = MockPriceOracle(address(protocolConfig.oracle));
-        AAPL_PRICE_FEED_ID = dclexProtocolHelperConfig.getPriceFeedId("AAPL");
-        NVDA_PRICE_FEED_ID = dclexProtocolHelperConfig.getPriceFeedId("NVDA");
+        AAPL_PRICE_FEED_ID = keccak256(abi.encodePacked(address(aaplStock)));
+        NVDA_PRICE_FEED_ID = keccak256(abi.encodePacked(address(nvdaStock)));
         USDC_PRICE_FEED_ID = dclexProtocolHelperConfig.getPriceFeedId("USDC");
         priceOracle.setPrice(AAPL_PRICE_FEED_ID, 20 ether);
         priceOracle.setPrice(NVDA_PRICE_FEED_ID, 30 ether);
