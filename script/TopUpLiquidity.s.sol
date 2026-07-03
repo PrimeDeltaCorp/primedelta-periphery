@@ -24,6 +24,7 @@ contract TopUpLiquidity is DclexStockList {
     function run() external {
         uint256 adminKey = vm.envUint("ADMIN_PRIVATE_KEY");
         address admin    = vm.envAddress("DCLEX_ADMIN");
+        require(vm.addr(adminKey) == admin, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
         Factory factory  = Factory(vm.envAddress("DCLEX_FACTORY"));
         string memory dusdSymbol = vm.envOr("DCLEX_DUSD_SYMBOL", string("dUSD"));
         string memory skip = vm.envOr("SKIP_SYMBOL", string("NFLX"));
