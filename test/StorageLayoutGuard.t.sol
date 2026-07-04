@@ -33,12 +33,12 @@ contract StorageLayoutGuardTest is Test {
         assertEq(
             _slotOf(labels, slots, "_expectedDclexCallbackPool"),
             DCLEX_SENTINEL_SLOT,
-            "_expectedDclexCallbackPool moved: update the vm.store slot in testV3CallbackRevertsWhileOnlyDclexSentinelSet"
+            "_expectedDclexCallbackPool moved: reconcile DCLEX_SENTINEL_SLOT here and the vm.store slot in testV3CallbackRevertsWhileOnlyDclexSentinelSet"
         );
         assertEq(
             _slotOf(labels, slots, "_expectedV3CallbackPool"),
             V3_SENTINEL_SLOT,
-            "_expectedV3CallbackPool moved: update the vm.store slot in testDclexCallbackRevertsWhileOnlyV3SentinelSet"
+            "_expectedV3CallbackPool moved: reconcile V3_SENTINEL_SLOT here and the vm.store slot in testDclexCallbackRevertsWhileOnlyV3SentinelSet"
         );
     }
 
