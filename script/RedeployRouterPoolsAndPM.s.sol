@@ -171,8 +171,17 @@ contract RedeployRouterPoolsAndPM is Script {
         StockInfo[] memory stocks = getAllStocks();
         Phase1Output memory ph = _phase1Deploy(cfg, deployerKey, stocks);
         _phase2Configure(ph, cfg, stocks, adminKey, masterAdminKey);
-        _phase3Initialize(ph, cfg, stocks, adminKey, masterAdminKey);
-        _phase4HandoffOracle(ph, cfg, deployerKey);
+        if (vm.envOr("SKIP_INIT", false)) {
+            // Slow/flaky RPCs stretch the gap between price signing and tx
+            // simulation past the 60s staleness window (StalePrice in sim even
+            // though live txs would be fine). Skip phases 3-4 here and run
+            // blockchain/scripts/initialize-dclex-pools.sh instead — it signs
+            // per pool just-in-time via cast and does the same init + handoff.
+            console.log("SKIP_INIT=true: phases 3-4 skipped; run initialize-dclex-pools.sh");
+        } else {
+            _phase3Initialize(ph, cfg, stocks, adminKey, masterAdminKey);
+            _phase4HandoffOracle(ph, cfg, deployerKey);
+        }
         _printSummary(ph, stocks);
     }
 
