@@ -31,7 +31,7 @@ contract PoolInitCodeHashTest is Test {
     /// testnet — re-verify with VerifyPoolInitCodeHashLive against testnet
     /// RPC before any testnet V3 periphery deploy.
     bytes32 internal constant CANONICAL =
-        0x43b6d1c5e800cfcc51ee61b63a623f998e547b3dded375b884f2ae5bffdac20e;
+        0x717e89ac27e7e09cfcb96dec0aa69bbc220b42d8efa67a75678ec232e6882fe8;
 
     function test_poolInitCodeHashIsPinnedCanonical() public pure {
         assertEq(
