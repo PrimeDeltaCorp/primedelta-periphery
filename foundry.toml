@@ -77,6 +77,11 @@ skip = [
     "script/DeployDclexRouterWithPools.s.sol",
 ]
 
+[invariant]
+runs = 128
+depth = 64
+fail_on_revert = false
+
 [rpc_endpoints]
 local = "http://127.0.0.1:8545"
 sepolia = "${SEPOLIA_RPC_URL}"
