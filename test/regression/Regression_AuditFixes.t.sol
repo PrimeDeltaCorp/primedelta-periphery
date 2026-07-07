@@ -172,7 +172,7 @@ contract Regression_AuditFixes is Test, TestBalance {
         vm.startPrank(account);
         aaplStock.approve(address(dclexRouter), 100000 ether);
         nvdaStock.approve(address(dclexRouter), 100000 ether);
-        dusdToken.approve(address(dclexRouter), 100000 ether);
+        dusdToken.approve(address(dclexRouter), 100000e6); // dUSD is 6-decimal
         vm.stopPrank();
     }
 

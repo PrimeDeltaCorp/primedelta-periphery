@@ -164,8 +164,10 @@ contract DclexRouterHandler is StdUtils {
                 EMPTY
             )
         {
-            uint256 got = IERC20(leg.token).balanceOf(address(this)) - before;
-            if (got < minOut) ghost_slippageViolated = true;
+            // Check direction BEFORE subtracting: a wrong-way result must RECORD the violation, not
+            // underflow-revert (which fail_on_revert=false would silently mask).
+            uint256 afterBal = IERC20(leg.token).balanceOf(address(this));
+            if (afterBal < before || afterBal - before < minOut) ghost_slippageViolated = true;
             ghost_swapsExecuted++;
         } catch {}
     }
@@ -191,8 +193,8 @@ contract DclexRouterHandler is StdUtils {
                 EMPTY
             )
         {
-            uint256 got = dusd.balanceOf(address(this)) - before;
-            if (got < minOut6) ghost_slippageViolated = true;
+            uint256 afterBal = dusd.balanceOf(address(this));
+            if (afterBal < before || afterBal - before < minOut6) ghost_slippageViolated = true;
             ghost_swapsExecuted++;
         } catch {}
     }
@@ -219,10 +221,12 @@ contract DclexRouterHandler is StdUtils {
                 EMPTY
             )
         {
-            uint256 spent = dusdBefore - dusd.balanceOf(address(this));
-            uint256 recv = IERC20(leg.token).balanceOf(address(this)) - stockBefore;
-            if (spent > maxIn6) ghost_slippageViolated = true;
-            if (recv < stockOut) ghost_exactOutputShort = true;
+            // Direction-safe deltas (no underflow revert to mask a violation): a buy must not INCREASE
+            // dUSD nor DECREASE stock.
+            uint256 dusdAfter = dusd.balanceOf(address(this));
+            uint256 stockAfter = IERC20(leg.token).balanceOf(address(this));
+            if (dusdAfter > dusdBefore || dusdBefore - dusdAfter > maxIn6) ghost_slippageViolated = true;
+            if (stockAfter < stockBefore || stockAfter - stockBefore < stockOut) ghost_exactOutputShort = true;
             ghost_swapsExecuted++;
         } catch {}
     }
@@ -249,10 +253,10 @@ contract DclexRouterHandler is StdUtils {
                 EMPTY
             )
         {
-            uint256 spent = stockBefore - IERC20(leg.token).balanceOf(address(this));
-            uint256 recv = dusd.balanceOf(address(this)) - dusdBefore;
-            if (spent > maxIn) ghost_slippageViolated = true;
-            if (recv < scOut6) ghost_exactOutputShort = true;
+            uint256 stockAfter = IERC20(leg.token).balanceOf(address(this));
+            uint256 dusdAfter = dusd.balanceOf(address(this));
+            if (stockAfter > stockBefore || stockBefore - stockAfter > maxIn) ghost_slippageViolated = true;
+            if (dusdAfter < dusdBefore || dusdAfter - dusdBefore < scOut6) ghost_exactOutputShort = true;
             ghost_swapsExecuted++;
         } catch {}
     }
@@ -284,8 +288,8 @@ contract DclexRouterHandler is StdUtils {
                 EMPTY
             )
         {
-            uint256 got = IERC20(outLeg.token).balanceOf(address(this)) - before;
-            if (got < minOut) ghost_slippageViolated = true;
+            uint256 afterBal = IERC20(outLeg.token).balanceOf(address(this));
+            if (afterBal < before || afterBal - before < minOut) ghost_slippageViolated = true;
             ghost_swapsExecuted++;
         } catch {}
     }
@@ -315,10 +319,10 @@ contract DclexRouterHandler is StdUtils {
                 EMPTY
             )
         {
-            uint256 spent = inBefore - IERC20(inLeg.token).balanceOf(address(this));
-            uint256 recv = IERC20(outLeg.token).balanceOf(address(this)) - outBefore;
-            if (spent > maxIn) ghost_slippageViolated = true;
-            if (recv < stockOut) ghost_exactOutputShort = true;
+            uint256 inAfter = IERC20(inLeg.token).balanceOf(address(this));
+            uint256 outAfter = IERC20(outLeg.token).balanceOf(address(this));
+            if (inAfter > inBefore || inBefore - inAfter > maxIn) ghost_slippageViolated = true;
+            if (outAfter < outBefore || outAfter - outBefore < stockOut) ghost_exactOutputShort = true;
             ghost_swapsExecuted++;
         } catch {}
     }

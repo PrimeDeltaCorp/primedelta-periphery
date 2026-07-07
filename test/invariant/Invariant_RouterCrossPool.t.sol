@@ -196,9 +196,10 @@ contract RouterCrossPoolHandler is Test {
             // trader-favoring (or fund-stealing) break.
             if (inAfter > inBefore) ghost_traderDirectionViolated = true;
             if (outAfter < outBefore) ghost_traderDirectionViolated = true;
-            // A settled exact-input cross swap consumes exactly `stockIn` and
-            // delivers a positive amount of the output token.
-            if (inBefore - inAfter != stockIn) ghost_traderDirectionViolated = true;
+            // A settled exact-input cross swap consumes exactly `stockIn` and delivers a positive
+            // amount of the output token. Guard the subtraction with the direction check so a wrong-way
+            // result records the violation instead of underflow-reverting (masked by fail_on_revert=false).
+            if (inAfter <= inBefore && inBefore - inAfter != stockIn) ghost_traderDirectionViolated = true;
             if (outAfter <= outBefore) ghost_traderDirectionViolated = true;
             ghost_crossSwapsSettled++;
         } catch {}
@@ -242,10 +243,14 @@ contract RouterCrossPoolHandler is Test {
             uint256 outAfter = IERC20(outLeg.token).balanceOf(trader);
             if (inAfter > inBefore) ghost_traderDirectionViolated = true;
             if (outAfter < outBefore) ghost_traderDirectionViolated = true;
-            // exact-output: received EXACTLY stockOut, spent > 0 and <= maxIn.
-            if (outAfter - outBefore != stockOut) ghost_traderDirectionViolated = true;
-            uint256 spent = inBefore - inAfter;
-            if (spent == 0 || spent > maxIn) ghost_traderDirectionViolated = true;
+            // exact-output: received EXACTLY stockOut, spent > 0 and <= maxIn. Guard the subtractions
+            // with the direction checks so a wrong-way result records the violation instead of
+            // underflow-reverting (which fail_on_revert=false would mask).
+            if (outAfter >= outBefore && outAfter - outBefore != stockOut) ghost_traderDirectionViolated = true;
+            if (inAfter <= inBefore) {
+                uint256 spent = inBefore - inAfter;
+                if (spent == 0 || spent > maxIn) ghost_traderDirectionViolated = true;
+            }
             ghost_crossSwapsSettled++;
         } catch {}
     }
