@@ -207,6 +207,18 @@ contract DclexRouterTest is Test, TestBalance {
         ADMIN = dclexRouter.owner();
     }
 
+    function testRouterAcceptsEmptyCalldataNativeRefund() external {
+        // A pool refunds the unused oracle fee to the router with an
+        // empty-calldata native transfer. Without a payable receive() this
+        // reverts and takes the whole overpaid swap down with it
+        // (DclexPool__NativeTransferFailed). Assert the router accepts it.
+        uint256 balanceBefore = address(dclexRouter).balance;
+        vm.deal(address(this), 1 ether);
+        (bool ok, ) = address(dclexRouter).call{value: 1 ether}("");
+        assertTrue(ok, "router must accept an empty-calldata native refund");
+        assertEq(address(dclexRouter).balance, balanceBefore + 1 ether);
+    }
+
     function _addV3Liquidity() private {
         // Add liquidity to V3 pool using direct mint callback
         // For testing, we'll use a simpler approach - deal tokens directly to pool
