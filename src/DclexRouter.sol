@@ -99,6 +99,13 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
         stablecoin = _stablecoin;
     }
 
+    /// @notice Accept native refunds. A pool pays the oracle fee out of the
+    ///         msg.value the router forwards and returns the excess to the
+    ///         router via an empty-calldata call; without a payable receive the
+    ///         refund — and thus the whole overpaid swap — reverts. refundETH()
+    ///         then forwards the excess on to the user.
+    receive() external payable {}
+
     /// @notice Recover ETH accidentally sent to the router. The router only
     ///         holds ETH transiently (in-flight oracle fee for a single
     ///         swap), so any persistent balance is misdirected and would be
