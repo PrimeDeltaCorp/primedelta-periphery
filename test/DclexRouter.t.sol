@@ -1030,6 +1030,107 @@ contract DclexRouterTest is Test, TestBalance {
         );
     }
 
+    // TQ-1: the single-pool DCLEX slippage floor (buyExactInput / sellExactInput) was
+    // previously untested — only the cross-pool swapExactInput min-out was covered, so
+    // deleting the buyExactInput/sellExactInput `outputAmount < minOutputAmount` guard
+    // left the suite fully green. These lock that floor. Pools are fee-free (0,0,0) at
+    // AAPL=$20, so $20 (20e6 dUSD) buys exactly 1 AAPL and 1 AAPL sells for exactly $20.
+    function testBuyExactInputRevertsWhenResultingOutputAmountIsBelowMinOutputAmount()
+        external
+    {
+        // 20e6 dUSD buys exactly 1 AAPL — a min-out of 1 ether + 1 (and anything above) must revert.
+        vm.expectRevert(DclexRouter.DclexRouter__OutputTooLow.selector);
+        dclexRouter.buyExactInput(
+            address(aaplStock),
+            20e6,
+            1 ether + 1,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+        vm.expectRevert(DclexRouter.DclexRouter__OutputTooLow.selector);
+        dclexRouter.buyExactInput(
+            address(aaplStock),
+            20e6,
+            2 ether,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+        // The exact reachable min-out (1 AAPL) must NOT revert — the guard is a floor, not a wall.
+        dclexRouter.buyExactInput(
+            address(aaplStock),
+            20e6,
+            1 ether,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+    }
+
+    function testSellExactInputRevertsWhenResultingOutputAmountIsBelowMinOutputAmount()
+        external
+    {
+        // 1 AAPL sells for exactly 20e6 dUSD — a min-out above that must revert.
+        vm.expectRevert(DclexRouter.DclexRouter__OutputTooLow.selector);
+        dclexRouter.sellExactInput(
+            address(aaplStock),
+            1 ether,
+            20e6 + 1,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+        vm.expectRevert(DclexRouter.DclexRouter__OutputTooLow.selector);
+        dclexRouter.sellExactInput(
+            address(aaplStock),
+            1 ether,
+            40e6,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+        // The exact reachable min-out (20 dUSD) must NOT revert.
+        dclexRouter.sellExactInput(
+            address(aaplStock),
+            1 ether,
+            20e6,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+    }
+
+    // TQ-2: the refundETH excess-native path had dead coverage — no unit swap forwarded a
+    // non-zero msg.value (mock oracle fee = 0), so redirecting the refund away from the
+    // caller (e.g. to owner()) went undetected. The pool refunds unused native to the
+    // router; refundETH must return it to the ORIGINAL caller, not anyone else.
+    function testBuyExactInputRefundsExcessNativeToCaller() external {
+        uint256 excess = 1 ether;
+        vm.deal(USER_1, excess);
+        uint256 callerBefore = USER_1.balance;
+        uint256 ownerBefore = dclexRouter.owner().balance;
+
+        vm.prank(USER_1);
+        dclexRouter.buyExactInput{value: excess}(
+            address(aaplStock),
+            20e6,
+            0,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+
+        assertEq(
+            USER_1.balance,
+            callerBefore,
+            "excess native must be fully refunded to the caller"
+        );
+        assertEq(
+            dclexRouter.owner().balance,
+            ownerBefore,
+            "refund must NOT be diverted to the router owner"
+        );
+        assertEq(
+            address(dclexRouter).balance,
+            0,
+            "router must hold no residual native"
+        );
+    }
+
     // ============ Pool Registry Tests ============
 
     function testAddPoolRevertsWhenCalledByNotAnOwner() external {
