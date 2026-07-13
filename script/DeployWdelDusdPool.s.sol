@@ -92,9 +92,15 @@ contract DeployWdelDusdPool is Script {
         }
 
         // Register WDEL on router. allStockTokens() includes V3 tokens, so this
-        // makes WDEL appear as a swappable asset.
-        DclexRouter(payable(router)).addPool(wdel, DclexRouter.PoolType.V3, pool, FEE_TIER);
-        console.log("Registered WDEL on router as V3 pool");
+        // makes WDEL appear as a swappable asset. Skip when router == 0 — on a
+        // gas-capped greenfield the pool must exist BEFORE the router (which
+        // RedeployRouterPoolsAndPM deploys and registers WDEL against in phase 2).
+        if (router != address(0)) {
+            DclexRouter(payable(router)).addPool(wdel, DclexRouter.PoolType.V3, pool, FEE_TIER);
+            console.log("Registered WDEL on router as V3 pool");
+        } else {
+            console.log("router == 0: skipping router registration (RedeployRouterPoolsAndPM does it)");
+        }
 
         vm.stopBroadcast();
     }
