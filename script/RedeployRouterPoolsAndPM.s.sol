@@ -273,7 +273,15 @@ contract RedeployRouterPoolsAndPM is Script {
         }
         ph.router.addPool(cfg.wdel, DclexRouter.PoolType.V3, cfg.wdelV3Pool, V3_FEE_TIER);
 
-        factory.forceMintStablecoin("dUSD", address(ph.batchInit), DUSD_AMOUNT * stocks.length);
+        // Fund the batch initializer ONLY when we will actually seed pools.
+        // Under SKIP_INIT (testnet/mainnet — no synthetic supply) phase 3's
+        // initializeAll never runs, so this mint would strand unbacked dUSD in
+        // the helper and inflate dUSD.totalSupply. Guard it so SKIP_INIT deploys
+        // leave dUSD.totalSupply == 0 (pools created uninitialized, seeded later
+        // by real liquidity).
+        if (!vm.envOr("SKIP_INIT", false)) {
+            factory.forceMintStablecoin("dUSD", address(ph.batchInit), DUSD_AMOUNT * stocks.length);
+        }
         vm.stopBroadcast();
 
         // Master admin grants DEFAULT_ADMIN_ROLE on Factory to batch initializer.
