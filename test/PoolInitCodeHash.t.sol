@@ -25,13 +25,24 @@ import {PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress
 ///   factory (covers the case where a NEW V3 factory was deployed and this
 ///   literal must be re-extracted + re-pinned).
 contract PoolInitCodeHashTest is Test {
-    /// @dev Canonical hash extracted 2026-06-21 from dev DclexPositionManager
-    /// 0x02E55935757d38D8b223FE7A450D9a17594a5013 (factory 0x948b3c65…). See
-    /// PoolAddress.sol natspec for extraction method. Same value pinned for
-    /// testnet — re-verify with VerifyPoolInitCodeHashLive against testnet
-    /// RPC before any testnet V3 periphery deploy.
+    /// @dev The hash is PER-FACTORY. Probed on-chain 2026-07-27 by CREATE2-deriving
+    /// the WDEL/dUSD/3000 pool from a candidate hash and comparing it against what
+    /// `Factory.getPool` returns:
+    ///
+    ///   dev      factory 0x778e8Cad0A010E5E40fE30E0e14e1E11Ee0b74c2 -> 0x717e89ac…
+    ///   mainnet  factory 0x3FfFBb81bE72ABFEC5754501BCe441088CBE3e33 -> 0x717e89ac…
+    ///   testnet  factory 0x28Fe900fc0Cc1749B132dCE753d5cB5bcA8cF678 -> 0xd1e22371…
+    ///   retired dev factory 0x948B3c65… matches neither (a third lineage).
+    ///
+    /// Pinned to the dev+mainnet value, which is also what a clean, fully recursive
+    /// checkout compiles to — so DeployV3Production's fresh-factory guard passes.
+    ///
+    /// ⚠ A periphery-only redeploy against the LIVE TESTNET factory needs
+    /// 0xd1e22371… instead; change both this constant and the literal for that run,
+    /// or redeploy the testnet factory from a clean checkout. Whatever you pin,
+    /// VerifyPoolInitCodeHashLive against the TARGET rpc is the deciding guard.
     bytes32 internal constant CANONICAL =
-        0xd1e22371f98b2eabd357d1c5840408aa772b3e3af559c5bd358823af98f92bd7;
+        0x717e89ac27e7e09cfcb96dec0aa69bbc220b42d8efa67a75678ec232e6882fe8;
 
     function test_poolInitCodeHashIsPinnedCanonical() public pure {
         assertEq(
