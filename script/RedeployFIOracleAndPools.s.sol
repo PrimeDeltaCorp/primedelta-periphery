@@ -100,6 +100,15 @@ contract RedeployFIOracleAndPools is DclexStockList {
         for (uint256 i = 0; i < stocks.length; i++) {
             did.mintAdmin(newPools[i], 2, bytes32(0));
         }
+        // Deregister, repoint the router's oracle pin, then re-register.
+        // Registering first reverts DclexRouter__OracleMismatch.
+        for (uint256 i = 0; i < stocks.length; i++) {
+            address stockAddr = factory.stocks(stocks[i].symbol);
+            if (router.getPoolType(stockAddr) == DclexRouter.PoolType.DCLEX) {
+                router.removePool(stockAddr, DclexRouter.PoolType.DCLEX);
+            }
+        }
+        router.setDclexOracle(address(fiOracle));
         for (uint256 i = 0; i < stocks.length; i++) {
             address stockAddr = factory.stocks(stocks[i].symbol);
             router.addPool(stockAddr, DclexRouter.PoolType.DCLEX, newPools[i], 0);

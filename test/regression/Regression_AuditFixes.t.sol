@@ -379,4 +379,113 @@ contract Regression_AuditFixes is Test, TestBalance {
         // Same price in, same (fee-free) pool math out — pricing unaffected by rename.
         assertEq(outAfter, outBefore);
     }
+
+    /// A DCLEX pool reading from a different FIOracle than the already
+    /// registered pools must be rejected. A cross-pool DCLEX swap carries one
+    /// priceUpdateData payload and can refresh only one oracle, so a split
+    /// registry makes that route revert with StalePrice.
+    function test_L03_AddPool_RevertsOnOracleMismatch() external {
+        MockPriceOracle otherOracle = new MockPriceOracle();
+        DclexPool mismatchedPool = new DclexPool(
+            IStock(address(amznStock)),
+            IERC20(address(dusdToken)),
+            otherOracle,
+            0,
+            0,
+            0,
+            ADMIN
+        );
+        assertEq(address(mismatchedPool.stockToken()), address(amznStock));
+        assertEq(address(mismatchedPool.stablecoinToken()), address(dusdToken));
+        assertTrue(address(mismatchedPool.oracle()) != dclexRouter.dclexOracle());
+
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__OracleMismatch.selector);
+        dclexRouter.addPool(
+            address(amznStock),
+            DclexRouter.PoolType.DCLEX,
+            address(mismatchedPool),
+            0
+        );
+    }
+
+    function test_L03_AddPool_PinsOracleAndAcceptsMatchingPool() external {
+        assertEq(
+            dclexRouter.dclexOracle(),
+            address(priceOracle),
+            "oracle must be pinned by the first DCLEX registration"
+        );
+
+        vm.prank(ADMIN);
+        dclexRouter.addPool(
+            address(amznStock),
+            DclexRouter.PoolType.DCLEX,
+            address(amznPool),
+            0
+        );
+
+        assertEq(
+            uint256(dclexRouter.getPoolType(address(amznStock))),
+            uint256(DclexRouter.PoolType.DCLEX)
+        );
+        assertEq(dclexRouter.dclexOracle(), address(priceOracle));
+    }
+
+    function test_L03_SetDclexOracle_OnlyOwnerAndValidated() external {
+        MockPriceOracle otherOracle = new MockPriceOracle();
+
+        vm.prank(USER_1);
+        vm.expectRevert();
+        dclexRouter.setDclexOracle(address(otherOracle));
+
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__ZeroAddress.selector);
+        dclexRouter.setDclexOracle(address(0));
+
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__NotAContract.selector);
+        dclexRouter.setDclexOracle(USER_1);
+    }
+
+    /// Repointing the pin while DCLEX pools are still registered would recreate
+    /// the split-oracle state the pin exists to prevent — a pool's oracle is
+    /// immutable and cannot be re-validated after the fact.
+    function test_L03_SetDclexOracle_RejectedWhileDclexPoolsRegistered() external {
+        MockPriceOracle otherOracle = new MockPriceOracle();
+        assertEq(dclexRouter.dclexPoolCount(), 2);
+
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__PoolsStillRegistered.selector);
+        dclexRouter.setDclexOracle(address(otherOracle));
+
+        vm.startPrank(ADMIN);
+        dclexRouter.removePool(address(aaplStock), DclexRouter.PoolType.DCLEX);
+        dclexRouter.removePool(address(nvdaStock), DclexRouter.PoolType.DCLEX);
+        assertEq(dclexRouter.dclexPoolCount(), 0);
+        dclexRouter.setDclexOracle(address(otherOracle));
+        vm.stopPrank();
+
+        assertEq(dclexRouter.dclexOracle(), address(otherOracle));
+    }
+
+    function test_L03_DclexPoolCountTracksReplacement() external {
+        assertEq(dclexRouter.dclexPoolCount(), 2);
+
+        vm.prank(ADMIN);
+        dclexRouter.addPool(
+            address(aaplStock),
+            DclexRouter.PoolType.DCLEX,
+            address(aaplPool),
+            0
+        );
+        assertEq(
+            dclexRouter.dclexPoolCount(),
+            2,
+            "re-registering the same token must not double count"
+        );
+
+        vm.prank(ADMIN);
+        dclexRouter.removePool(address(aaplStock), DclexRouter.PoolType.DCLEX);
+        assertEq(dclexRouter.dclexPoolCount(), 1);
+    }
 }

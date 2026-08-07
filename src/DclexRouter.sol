@@ -10,6 +10,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
 import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
 import {IDclexSwapCallback} from "dclex-protocol/src/IDclexSwapCallback.sol";
+import {IPriceOracle} from "dclex-protocol/src/IPriceOracle.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
@@ -31,6 +32,9 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
     error DclexRouter__InvalidPoolType();
     error DclexRouter__PoolTypeMismatch();
     error DclexRouter__FeeTierNotAllowedForType();
+    error DclexRouter__OracleMismatch();
+    error DclexRouter__NotAContract();
+    error DclexRouter__PoolsStillRegistered();
 
     enum PoolType {
         NONE,
@@ -82,6 +86,14 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
     // DCLEX, etc.); each leg only touches its own sentinel.
     address private _expectedDclexCallbackPool;
     address private _expectedV3CallbackPool;
+
+    /// @notice The FIOracle every registered DCLEX pool must read from.
+    ///         Pinned on the first DCLEX registration.
+    address public dclexOracle;
+
+    uint256 public dclexPoolCount;
+
+    event DclexOracleSet(address indexed oracle);
 
     event PoolSetForToken(
         address indexed token,
@@ -160,11 +172,23 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
         PoolType prev = stockPoolType[token];
         if (prev == PoolType.DCLEX) {
             delete stockToDclexPool[token];
+            dclexPoolCount--;
         } else if (prev == PoolType.V3) {
             delete stockToV3Pool[token];
             delete stockToFeeTier[token];
         }
         stockPoolType[token] = PoolType.NONE;
+    }
+
+    /// @notice Repoint the expected DCLEX oracle after an FIOracle redeploy.
+    ///         Deregister every DCLEX pool first, then repoint, then re-register.
+    ///         Full procedure: DEPLOYMENT_GUIDE.md, "Redeploying the FIOracle".
+    function setDclexOracle(address newOracle) external onlyOwner {
+        if (newOracle == address(0)) revert DclexRouter__ZeroAddress();
+        if (newOracle.code.length == 0) revert DclexRouter__NotAContract();
+        if (dclexPoolCount != 0) revert DclexRouter__PoolsStillRegistered();
+        dclexOracle = newOracle;
+        emit DclexOracleSet(newOracle);
     }
 
     /// @notice Register (or replace) `token`'s pool of the given type.
@@ -202,9 +226,23 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
             } catch {
                 revert DclexRouter__PoolMismatch();
             }
+            address poolOracle;
+            try DclexPool(pool).oracle() returns (IPriceOracle o) {
+                poolOracle = address(o);
+            } catch {
+                revert DclexRouter__PoolMismatch();
+            }
+            if (poolOracle == address(0)) revert DclexRouter__PoolMismatch();
+            if (dclexOracle == address(0)) {
+                dclexOracle = poolOracle;
+                emit DclexOracleSet(poolOracle);
+            } else if (poolOracle != dclexOracle) {
+                revert DclexRouter__OracleMismatch();
+            }
             _clearStockRegistry(token);
             stockPoolType[token] = PoolType.DCLEX;
             stockToDclexPool[token] = DclexPool(pool);
+            dclexPoolCount++;
             _addToStockTokens(token);
             emit PoolSetForToken(token, pool, PoolType.DCLEX);
         } else if (poolType == PoolType.V3) {
