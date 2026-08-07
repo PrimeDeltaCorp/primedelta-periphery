@@ -8,6 +8,7 @@ import {
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
 import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
 import {IDclexSwapCallback} from "dclex-protocol/src/IDclexSwapCallback.sol";
@@ -21,6 +22,7 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 /// @dev wDEL is treated as a normal V3 token — wrapping/unwrapping is frontend responsibility.
 contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUniswapV3SwapCallback {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     error DclexRouter__InputTooHigh();
     error DclexRouter__OutputTooLow();
@@ -71,7 +73,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     mapping(address => uint24) public stockToFeeTier;
 
     // Legacy compatibility
-    address[] private stockTokens;
+    EnumerableSet.AddressSet private stockTokens;
     // Per-callback-type sentinels: set to the pool we expect to receive
     // the matching swap callback from, immediately before calling that
     // pool's swap entry; restored to the previous value right after.
@@ -317,7 +319,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     }
 
     function allStockTokens() external view returns (address[] memory) {
-        return stockTokens;
+        return stockTokens.values();
     }
 
 
@@ -1132,21 +1134,10 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     }
 
     function _addToStockTokens(address token) private {
-        for (uint256 i = 0; i < stockTokens.length; ++i) {
-            if (stockTokens[i] == token) {
-                return;
-            }
-        }
-        stockTokens.push(token);
+        stockTokens.add(token);
     }
 
     function _removeFromStockTokens(address token) private {
-        for (uint256 i = 0; i < stockTokens.length; ++i) {
-            if (stockTokens[i] == token) {
-                stockTokens[i] = stockTokens[stockTokens.length - 1];
-                stockTokens.pop();
-                return;
-            }
-        }
+        stockTokens.remove(token);
     }
 }
