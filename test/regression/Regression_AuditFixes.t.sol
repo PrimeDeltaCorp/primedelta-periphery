@@ -553,4 +553,29 @@ contract Regression_AuditFixes is Test, TestBalance {
         assertEq(dclexRouter.allStockTokens().length, 0);
     }
 
+    function test_R07_CrossPoolSwapRejectsSameToken() external {
+        vm.startPrank(USER_1);
+
+        vm.expectRevert(DclexRouter.DclexRouter__SameToken.selector);
+        dclexRouter.swapExactInput(
+            address(aaplStock),
+            address(aaplStock),
+            1 ether,
+            0,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+
+        vm.expectRevert(DclexRouter.DclexRouter__SameToken.selector);
+        dclexRouter.swapExactOutput(
+            address(aaplStock),
+            address(aaplStock),
+            1 ether,
+            type(uint256).max,
+            block.timestamp + 1,
+            PRICE_DATA
+        );
+
+        vm.stopPrank();
+    }
 }
