@@ -17,6 +17,7 @@ contract DclexPositionManager is NonfungiblePositionManager {
 
     error DclexPositionManager__TransferNotAllowed();
     error DclexPositionManager__ZeroTokenDescriptor();
+    error DclexPositionManager__ZeroDID();
 
     constructor(
         address _factory,
@@ -25,6 +26,7 @@ contract DclexPositionManager is NonfungiblePositionManager {
         IDID _did
     ) NonfungiblePositionManager(_factory, _WETH9, _tokenDescriptor) {
         if (_tokenDescriptor == address(0)) revert DclexPositionManager__ZeroTokenDescriptor();
+        if (address(_did) == address(0)) revert DclexPositionManager__ZeroDID();
         did = _did;
     }
 

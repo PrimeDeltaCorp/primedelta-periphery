@@ -21,4 +21,10 @@ contract DclexPositionManagerDescriptorGuardTest is Test {
         DclexPositionManager npm = new DclexPositionManager(factory, weth, address(descriptor), did);
         assertEq(address(npm.did()), address(did));
     }
+
+    function test_constructor_revertsOnZeroDID() public {
+        DclexNFTDescriptor descriptor = new DclexNFTDescriptor(address(this), "https://x/");
+        vm.expectRevert(DclexPositionManager.DclexPositionManager__ZeroDID.selector);
+        new DclexPositionManager(factory, weth, address(descriptor), IDID(address(0)));
+    }
 }
