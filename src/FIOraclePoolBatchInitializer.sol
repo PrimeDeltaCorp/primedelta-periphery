@@ -24,6 +24,8 @@ contract FIOraclePoolBatchInitializer {
     /// transient grant can't be used by another caller.
     address public immutable authorizedCaller;
 
+    bytes32 private constant DEFAULT_ADMIN_ROLE = 0x00;
+
     error FIOraclePoolBatchInitializer__Unauthorized();
     error FIOraclePoolBatchInitializer__ZeroAddress();
 
@@ -64,6 +66,20 @@ contract FIOraclePoolBatchInitializer {
         if (address(this).balance > 0) {
             (bool ok, ) = msg.sender.call{value: address(this).balance}("");
             require(ok, "refund failed");
+        }
+
+        renounceFactoryAdmin(p.factory);
+    }
+
+    /// @notice Drop this helper's Factory DEFAULT_ADMIN_ROLE, for the abort path
+    ///         where initializeAll never completed.
+    /// @dev Restricted to `authorizedCaller` for the same reason as the sibling
+    ///      helper: the grant and its use are separate transactions, and a
+    ///      permissionless entry point is a repeatable deploy-griefing vector.
+    function renounceFactoryAdmin(Factory factory) public {
+        if (msg.sender != authorizedCaller) revert FIOraclePoolBatchInitializer__Unauthorized();
+        if (factory.hasRole(DEFAULT_ADMIN_ROLE, address(this))) {
+            factory.renounceRole(DEFAULT_ADMIN_ROLE, address(this));
         }
     }
 

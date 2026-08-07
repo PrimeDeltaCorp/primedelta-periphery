@@ -83,5 +83,19 @@ contract BatchPoolDeployer {
         }
 
         params.router.transferOwnership(params.finalOwner);
+
+        renounceDidAdmin(digitalIdentity);
+    }
+
+    /// @notice Drop this helper's DID DEFAULT_ADMIN_ROLE, for the abort path
+    ///         where deployAllPools never completed.
+    /// @dev Restricted to `deployer`. The grant and its use are always separate
+    ///      transactions, so a permissionless entry point would let anyone strip
+    ///      the role in that window and make the deploy revert, repeatably.
+    function renounceDidAdmin(DigitalIdentity digitalIdentity) public {
+        if (msg.sender != deployer) revert BatchPoolDeployer__Unauthorized();
+        if (digitalIdentity.hasRole(DEFAULT_ADMIN_ROLE, address(this))) {
+            digitalIdentity.renounceRole(DEFAULT_ADMIN_ROLE, address(this));
+        }
     }
 }
