@@ -1003,7 +1003,14 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
         address token,
         uint256 amount
     ) private returns (uint256 stableOut) {
-        (, stableOut) = _v3Swap(int256(amount), token, address(this), _routerCtxForV3(token, token, amount));
+        uint256 stockUsed;
+        (stockUsed, stableOut) = _v3Swap(
+            int256(amount),
+            token,
+            address(this),
+            _routerCtxForV3(token, token, amount)
+        );
+        if (stockUsed < amount) revert DclexRouter__NoLiquidity();
     }
 
     function _buyExactInputOnV3(
@@ -1011,12 +1018,14 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
         uint256 stablecoinAmount,
         address recipient
     ) private returns (uint256 stockOut) {
-        (, stockOut) = _v3Swap(
+        uint256 stablecoinUsed;
+        (stablecoinUsed, stockOut) = _v3Swap(
             int256(stablecoinAmount),
             address(stablecoin),
             recipient,
             _routerCtxForV3(token, address(stablecoin), stablecoinAmount)
         );
+        if (stablecoinUsed < stablecoinAmount) revert DclexRouter__NoLiquidity();
     }
 
     function _sellExactOutputOnV3(
