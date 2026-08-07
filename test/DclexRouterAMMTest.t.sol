@@ -1231,4 +1231,60 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
             "router must not retain stock"
         );
     }
+
+    function test_R06_SwapAmountAboveInt256MaxReverts() public {
+        uint256 overflowing = uint256(type(int256).max) + 1;
+        dusdToken.mint(USER_1, overflowing);
+
+        vm.startPrank(USER_1);
+        dusdToken.approve(address(dclexRouter), overflowing);
+        vm.expectRevert(abi.encodeWithSignature("SafeCastOverflowedUintToInt(uint256)", overflowing));
+        dclexRouter.buyExactInput(address(ammStock1), overflowing, 0, block.timestamp + 1, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function test_R06_BuyExactOutputAmountAboveInt256MaxReverts() public {
+        uint256 overflowing = uint256(type(int256).max) + 1;
+        dusdToken.mint(USER_1, 1000e6);
+
+        vm.startPrank(USER_1);
+        dusdToken.approve(address(dclexRouter), type(uint256).max);
+        vm.expectRevert(abi.encodeWithSignature("SafeCastOverflowedUintToInt(uint256)", overflowing));
+        dclexRouter.buyExactOutput(address(ammStock1), overflowing, 1000e6, block.timestamp + 1, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function test_R06_SellExactOutputAmountAboveInt256MaxReverts() public {
+        uint256 overflowing = uint256(type(int256).max) + 1;
+
+        vm.startPrank(USER_1);
+        ammStock1.approve(address(dclexRouter), type(uint256).max);
+        vm.expectRevert(abi.encodeWithSignature("SafeCastOverflowedUintToInt(uint256)", overflowing));
+        dclexRouter.sellExactOutput(address(ammStock1), overflowing, 10000e18, block.timestamp + 1, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function test_R06_SellExactInputAmountAboveInt256MaxReverts() public {
+        uint256 overflowing = uint256(type(int256).max) + 1;
+        vm.prank(ADMIN);
+        stocksFactory.forceMintStocks("AMMT1", USER_1, overflowing);
+
+        vm.startPrank(USER_1);
+        ammStock1.approve(address(dclexRouter), type(uint256).max);
+        vm.expectRevert(abi.encodeWithSignature("SafeCastOverflowedUintToInt(uint256)", overflowing));
+        dclexRouter.sellExactInput(address(ammStock1), overflowing, 0, block.timestamp + 1, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function test_R06_CrossPoolExactOutputAmountAboveInt256MaxReverts() public {
+        uint256 overflowing = uint256(type(int256).max) + 1;
+
+        vm.startPrank(USER_1);
+        aaplStock.approve(address(dclexRouter), type(uint256).max);
+        vm.expectRevert(abi.encodeWithSignature("SafeCastOverflowedUintToInt(uint256)", overflowing));
+        dclexRouter.swapExactOutput(
+            address(aaplStock), address(ammStock1), overflowing, 10000e18, block.timestamp + 1, new bytes[](0)
+        );
+        vm.stopPrank();
+    }
 }
