@@ -21,8 +21,8 @@ import "forge-std/Test.sol";
 ///   behavioral guards into no-ops.
 /// - No FFI: the artifact is read from ./out (already in fs_permissions).
 contract StorageLayoutGuardTest is Test {
-    uint256 internal constant DCLEX_SENTINEL_SLOT = 7;
-    uint256 internal constant V3_SENTINEL_SLOT = 8;
+    uint256 internal constant DCLEX_SENTINEL_SLOT = 8;
+    uint256 internal constant V3_SENTINEL_SLOT = 9;
 
     function test_sentinelSlotsMatchCompiledLayout() public view {
         string memory json = vm.readFile("out/DclexRouter.sol/DclexRouter.json");

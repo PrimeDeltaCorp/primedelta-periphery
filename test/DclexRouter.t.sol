@@ -1616,7 +1616,7 @@ contract DclexRouterTest is Test, TestBalance {
     function testDclexCallbackRevertsWhileOnlyV3SentinelSet() external {
         address fakeV3Pool = address(0xBEEF);
         // Poke V3 sentinel only — simulate mid-V3-swap state.
-        vm.store(address(dclexRouter), bytes32(uint256(8)), bytes32(uint256(uint160(fakeV3Pool))));
+        vm.store(address(dclexRouter), bytes32(uint256(9)), bytes32(uint256(uint160(fakeV3Pool))));
 
         // Positive control: this write must actually wire
         // `_expectedV3CallbackPool` (catches silent storage-layout drift).
@@ -1657,7 +1657,7 @@ contract DclexRouterTest is Test, TestBalance {
     function testV3CallbackRevertsWhileOnlyDclexSentinelSet() external {
         address fakeDclexPool = address(0xCAFE);
         // Poke DCLEX sentinel only.
-        vm.store(address(dclexRouter), bytes32(uint256(7)), bytes32(uint256(uint160(fakeDclexPool))));
+        vm.store(address(dclexRouter), bytes32(uint256(8)), bytes32(uint256(uint160(fakeDclexPool))));
 
         // Positive control: this write must actually wire
         // `_expectedDclexCallbackPool`. Call the DCLEX callback from

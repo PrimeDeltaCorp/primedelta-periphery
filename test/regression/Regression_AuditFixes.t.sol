@@ -524,4 +524,32 @@ contract Regression_AuditFixes is Test, TestBalance {
         assertEq(dclexRouter.owner(), newOwner);
         assertEq(dclexRouter.pendingOwner(), address(0));
     }
+
+    function test_R05_RegistryHasNoDuplicatesAndRemovesCleanly() external {
+        address[] memory before = dclexRouter.allStockTokens();
+        assertEq(before.length, 2, "AAPL + NVDA registered in setUp");
+
+        vm.prank(ADMIN);
+        dclexRouter.addPool(
+            address(aaplStock),
+            DclexRouter.PoolType.DCLEX,
+            address(aaplPool),
+            0
+        );
+        assertEq(
+            dclexRouter.allStockTokens().length,
+            2,
+            "re-registering must not duplicate the entry"
+        );
+
+        vm.prank(ADMIN);
+        dclexRouter.removePool(address(aaplStock), DclexRouter.PoolType.DCLEX);
+        address[] memory after_ = dclexRouter.allStockTokens();
+        assertEq(after_.length, 1);
+        assertEq(after_[0], address(nvdaStock), "surviving entry must be NVDA");
+
+        vm.prank(ADMIN);
+        dclexRouter.removePool(address(nvdaStock), DclexRouter.PoolType.DCLEX);
+        assertEq(dclexRouter.allStockTokens().length, 0);
+    }
 }
