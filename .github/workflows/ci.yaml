@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  FOUNDRY_PROFILE: default
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # lib/dclex-blockchain, lib/dclex-protocol and lib/v3-periphery are
+      # private PrimeDeltaCorp repos, so the default GITHUB_TOKEN cannot fetch
+      # them. SUBMODULE_TOKEN must be a PAT (or app token) with read access to
+      # all three. Without it this step fails loudly rather than silently
+      # building against missing libraries.
+      - name: Fetch submodules
+        env:
+          SUBMODULE_TOKEN: ${{ secrets.SUBMODULE_TOKEN }}
+        run: |
+          if [ -z "$SUBMODULE_TOKEN" ]; then
+            echo "::error::SUBMODULE_TOKEN is not set — private submodules cannot be fetched."
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${SUBMODULE_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init --recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Show versions
+        run: forge --version
+
+      - name: Build
+        run: forge build
+
+      - name: Test
+        run: forge test -vv
+
+      - name: Check formatting
+        run: forge fmt --check
+        continue-on-error: true
