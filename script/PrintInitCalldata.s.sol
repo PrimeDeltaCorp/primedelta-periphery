@@ -54,7 +54,20 @@ contract PrintInitCalldata is Script {
             priceUpdateData[i] = abi.encodePacked(fid, MOCK_PRICE, EXPO, publishTime, v, r, s);
         }
 
-        bytes memory calldata_ = abi.encodeCall(
+        console.log("publishTime:", publishTime);
+        console.log("CALLDATA:");
+        console.logBytes(_encodeInit(factory, dusdAddr, pools, symbols, priceUpdateData));
+    }
+
+    /// @dev Split out of run() to keep it under the stack limit.
+    function _encodeInit(
+        Factory factory,
+        address dusdAddr,
+        address[] memory pools,
+        string[] memory symbols,
+        bytes[] memory priceUpdateData
+    ) private view returns (bytes memory) {
+        return abi.encodeCall(
             FIOraclePoolBatchInitializer.initializeAll,
             (FIOraclePoolBatchInitializer.InitParams({
                 factory: factory,
@@ -64,12 +77,9 @@ contract PrintInitCalldata is Script {
                 priceUpdateData: priceUpdateData,
                 stockAmount: STOCK_AMOUNT,
                 dusdAmount: DUSD_AMOUNT,
-                feePerPool: INITIAL_UPDATE_FEE
+                feePerPool: INITIAL_UPDATE_FEE,
+                lpRecipient: vm.envAddress("LP_RECIPIENT")
             }))
         );
-
-        console.log("publishTime:", publishTime);
-        console.log("CALLDATA:");
-        console.logBytes(calldata_);
     }
 }

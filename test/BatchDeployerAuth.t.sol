@@ -10,6 +10,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPriceOracle} from "dclex-protocol/src/IPriceOracle.sol";
 import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
 import {USDCMock} from "dclex-blockchain/contracts/mocks/USDCMock.sol";
+import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
+import {MockPriceOracle} from "dclex-protocol/test/MockPriceOracle.sol";
 import {DigitalIdentity} from "dclex-blockchain/contracts/dclex/DigitalIdentity.sol";
 import {DeployDclex} from "dclex-protocol/script/DeployDclex.s.sol";
 
@@ -288,5 +290,88 @@ contract BatchDeployerAuthTest is Test {
                 lpRecipient: address(0)
             })
         );
+    }
+
+    /// End-to-end: the genesis LP must land on `lpRecipient`, not on the helper
+    /// that pays for it. Mutating the parameter away leaves every other test green.
+    struct SeedFixture {
+        Factory factory;
+        DigitalIdentity did;
+        USDCMock dusd;
+        DclexPool pool;
+        FIOraclePoolBatchInitializer batchInit;
+        MockPriceOracle oracle;
+        address admin;
+        address stock;
+    }
+
+    function _seedFixture(string memory tag) private returns (SeedFixture memory f) {
+        address master = makeAddr(string.concat("master_", tag));
+        f.admin = makeAddr(string.concat("admin_", tag));
+        DeployDclex.DclexContracts memory contracts = (new DeployDclex()).run(f.admin, master);
+        f.factory = contracts.stocksFactory;
+        f.did = contracts.digitalIdentity;
+
+        string[] memory names = new string[](1);
+        string[] memory symbols = new string[](1);
+        names[0] = "Apple";
+        symbols[0] = "AAPL";
+        vm.prank(f.admin);
+        f.factory.createStocks(names, symbols);
+        f.stock = f.factory.stocks("AAPL");
+
+        f.dusd = new USDCMock("dUSD", "dUSD");
+        f.oracle = new MockPriceOracle();
+        f.oracle.setPrice(keccak256(abi.encodePacked(f.stock)), 20 ether);
+
+        f.batchInit = new FIOraclePoolBatchInitializer(address(this));
+        f.pool = new DclexPool(
+            IStock(f.stock), IERC20(address(f.dusd)), f.oracle, 0, 0, 0, f.admin, address(f.batchInit)
+        );
+
+        vm.prank(master);
+        f.factory.grantRole(0x00, address(f.batchInit));
+        f.dusd.mint(address(f.batchInit), 1_000e6);
+    }
+
+    function testInitializeAllMintsTheGenesisLpToTheNamedRecipient() external {
+        SeedFixture memory f = _seedFixture("seed6");
+        address treasury = makeAddr("treasury6");
+        Factory factory = f.factory;
+        DigitalIdentity did = f.did;
+        DclexPool pool = f.pool;
+        FIOraclePoolBatchInitializer batchInit = f.batchInit;
+        address admin = f.admin;
+
+        string[] memory symbols = new string[](1);
+        symbols[0] = "AAPL";
+
+        vm.startPrank(admin);
+        did.mintAdmin(address(pool), 0, bytes32(0));
+        did.mintAdmin(address(batchInit), 0, bytes32(0));
+        did.mintAdmin(treasury, 0, bytes32(0));
+        vm.stopPrank();
+
+        address[] memory pools = new address[](1);
+        pools[0] = address(pool);
+        bytes[] memory priceData = new bytes[](1);
+        priceData[0] = f.oracle.getUpdatePriceData(keccak256(abi.encodePacked(f.stock)), 20 ether);
+
+        batchInit.initializeAll(
+            FIOraclePoolBatchInitializer.InitParams({
+                factory: factory,
+                dusdToken: IERC20(address(f.dusd)),
+                pools: pools,
+                stockSymbols: symbols,
+                priceUpdateData: priceData,
+                stockAmount: 10 ether,
+                dusdAmount: 1_000e6,
+                feePerPool: 0,
+                lpRecipient: treasury
+            })
+        );
+
+        assertGt(pool.balanceOf(treasury), 0, "the named recipient must hold the genesis LP");
+        assertEq(pool.balanceOf(address(batchInit)), 0, "the paying helper must hold none");
     }
 }

@@ -73,7 +73,13 @@ contract RedeployFIOracleAndPools is DclexStockList {
         vm.stopBroadcast();
         console.log("New FIOracle:", address(fiOracle));
 
-        // Phase 2 (deployer): deploy 44 new DclexPools.
+        // Phase 2 (admin, then deployer): the batch initializer is deployed first
+        // because it is the account that calls initialize later, so it has to be
+        // named as the pools' seeder at construction.
+        vm.startBroadcast(adminKey);
+        FIOraclePoolBatchInitializer batchInit = new FIOraclePoolBatchInitializer(ADMIN);
+        vm.stopBroadcast();
+
         address[] memory newPools = new address[](stocks.length);
         vm.startBroadcast(deployerKey);
         for (uint256 i = 0; i < stocks.length; i++) {
@@ -87,7 +93,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
                 0.0005 ether,
                 0.15 ether, // protocol-fee cut baked at deploy (#256)
                 ADMIN,
-                ADMIN
+                address(batchInit)
             );
             newPools[i] = address(pool);
         }
@@ -96,7 +102,6 @@ contract RedeployFIOracleAndPools is DclexStockList {
         // Phase 3a (admin): deploy batch initializer, mint DIDs for it and
         // each new pool, route stock→newPool, fund the initializer with dUSD.
         vm.startBroadcast(adminKey);
-        FIOraclePoolBatchInitializer batchInit = new FIOraclePoolBatchInitializer(ADMIN);
         did.mintAdmin(address(batchInit), 2, bytes32(0));
         for (uint256 i = 0; i < stocks.length; i++) {
             did.mintAdmin(newPools[i], 2, bytes32(0));
