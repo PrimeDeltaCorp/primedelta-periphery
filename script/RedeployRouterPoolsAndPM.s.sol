@@ -290,10 +290,14 @@ contract RedeployRouterPoolsAndPM is Script {
         }
         vm.stopBroadcast();
 
-        // Master admin grants DEFAULT_ADMIN_ROLE on Factory to batch initializer.
-        vm.startBroadcast(masterAdminKey);
-        factory.grantRole(0x00, address(ph.batchInit));
-        vm.stopBroadcast();
+        // Master admin grants DEFAULT_ADMIN_ROLE on Factory to the batch
+        // initializer. Under SKIP_INIT phase 3 never runs, so granting it would
+        // strand an unused admin role on the helper forever.
+        if (!vm.envOr("SKIP_INIT", false)) {
+            vm.startBroadcast(masterAdminKey);
+            factory.grantRole(0x00, address(ph.batchInit));
+            vm.stopBroadcast();
+        }
     }
 
     // ============ Phase 3 (admin): build signed price payloads, batch init pools ============
