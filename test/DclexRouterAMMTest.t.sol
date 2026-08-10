@@ -1143,4 +1143,91 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
             "router must not retain stablecoin"
         );
     }
+
+    function test_M01_SellExactInput_V3_RevertsOnPartialConsumption() public {
+        (Stock stock, address pool) = _createBoundedRangeV3Pool(
+            "AMMT5", 20e6, 10e18, 200e6, 2
+        );
+
+        uint256 exactIn = stock.balanceOf(pool) * 500;
+        vm.prank(ADMIN);
+        stocksFactory.forceMintStocks("AMMT5", USER_1, exactIn);
+
+        vm.startPrank(USER_1);
+        stock.approve(address(dclexRouter), exactIn);
+        vm.expectRevert(DclexRouter.DclexRouter__NoLiquidity.selector);
+        dclexRouter.sellExactInput(
+            address(stock),
+            exactIn,
+            0,
+            block.timestamp + 1,
+            new bytes[](0)
+        );
+        vm.stopPrank();
+
+        assertEq(
+            stock.balanceOf(address(dclexRouter)),
+            0,
+            "router must not strand input tokens"
+        );
+    }
+
+    function test_M01_BuyExactInput_V3_RevertsOnPartialConsumption() public {
+        (Stock stock, address pool) = _createBoundedRangeV3Pool(
+            "AMMT6", 20e6, 10e18, 200e6, 2
+        );
+
+        uint256 exactIn = dusdToken.balanceOf(pool) * 500;
+        dusdToken.mint(USER_1, exactIn);
+
+        vm.startPrank(USER_1);
+        dusdToken.approve(address(dclexRouter), exactIn);
+        vm.expectRevert(DclexRouter.DclexRouter__NoLiquidity.selector);
+        dclexRouter.buyExactInput(
+            address(stock),
+            exactIn,
+            0,
+            block.timestamp + 1,
+            new bytes[](0)
+        );
+        vm.stopPrank();
+
+        assertEq(
+            dusdToken.balanceOf(address(dclexRouter)),
+            0,
+            "router must not strand input stablecoin"
+        );
+    }
+
+    function test_M01_ExactInput_V3_AmpleLiquidityUnaffected() public {
+        uint256 exactIn = 100e6;
+        uint256 stockBefore = ammStock1.balanceOf(USER_1);
+
+        vm.startPrank(USER_1);
+        dusdToken.approve(address(dclexRouter), exactIn);
+        dclexRouter.buyExactInput(
+            address(ammStock1),
+            exactIn,
+            0,
+            block.timestamp + 1,
+            new bytes[](0)
+        );
+        vm.stopPrank();
+
+        assertGt(
+            ammStock1.balanceOf(USER_1),
+            stockBefore,
+            "user must receive stock"
+        );
+        assertEq(
+            dusdToken.balanceOf(address(dclexRouter)),
+            0,
+            "router must not retain stablecoin"
+        );
+        assertEq(
+            ammStock1.balanceOf(address(dclexRouter)),
+            0,
+            "router must not retain stock"
+        );
+    }
 }
