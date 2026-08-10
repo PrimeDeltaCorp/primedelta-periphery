@@ -46,6 +46,15 @@ jobs:
       - name: Build
         run: forge build
 
+      # The default profile skips the deployment scripts, so a signature change
+      # can break them without CI noticing. Build the profiles that include them.
+      # --via-ir because SeedLiquidity and PrintInitCalldata exceed the stack
+      # limit without it, which is why the default profile skips them.
+      - name: Build deployment-script profiles
+        run: |
+          FOUNDRY_PROFILE=router-deploy forge build --via-ir
+          FOUNDRY_PROFILE=pool-deploy forge build --via-ir
+
       - name: Test
         run: forge test -vv
 

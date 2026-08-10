@@ -128,14 +128,16 @@ contract DclexRouterGasTest is Test {
             dclexProtocolHelperConfig,
             0,
             0,
-            0
+            0,
+            address(this)
         );
         nvdaPool = dclexPoolDeployer.run(
             IStock(address(nvdaStock)),
             dclexProtocolHelperConfig,
             0,
             0,
-            0
+            0,
+            address(this)
         );
 
         // Register pools in router
@@ -165,8 +167,8 @@ contract DclexRouterGasTest is Test {
         vm.stopPrank();
 
         // Initialize pools with liquidity
-        aaplPool.initialize(100 ether, 2000e6, new bytes[](0));
-        nvdaPool.initialize(100 ether, 2000e6, new bytes[](0));
+        aaplPool.initialize(100 ether, 2000e6, address(this), new bytes[](0));
+        nvdaPool.initialize(100 ether, 2000e6, address(this), new bytes[](0));
     }
 
     function setupAccount(address account) private {

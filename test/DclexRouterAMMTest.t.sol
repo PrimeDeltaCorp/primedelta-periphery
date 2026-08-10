@@ -145,7 +145,8 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
             dclexProtocolHelperConfig,
             0,
             0,
-            0
+            0,
+            address(this)
         );
         dclexRouter.addPool(address(aaplStock), DclexRouter.PoolType.DCLEX, address(aaplPool), 0);
 
@@ -381,7 +382,7 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
         vm.stopPrank();
 
         // Initialize custom pool with liquidity
-        aaplPool.initialize(100e18, 2000e6, PRICE_DATA);
+        aaplPool.initialize(100e18, 2000e6, address(this), PRICE_DATA);
 
         // Give test contract ETH
         vm.deal(address(this), 10 ether);

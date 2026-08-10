@@ -118,9 +118,12 @@ contract Regression_AuditFixes is Test, TestBalance {
 
         // ----- Pools -----
         DeployDclexPool poolDeployer = new DeployDclexPool();
-        aaplPool = poolDeployer.run(IStock(address(aaplStock)), helper, 0, 0, 0);
-        nvdaPool = poolDeployer.run(IStock(address(nvdaStock)), helper, 0, 0, 0);
-        amznPool = poolDeployer.run(IStock(address(amznStock)), helper, 0, 0, 0);
+        aaplPool = poolDeployer.run(IStock(address(aaplStock)), helper, 0, 0, 0,
+            address(this));
+        nvdaPool = poolDeployer.run(IStock(address(nvdaStock)), helper, 0, 0, 0,
+            address(this));
+        amznPool = poolDeployer.run(IStock(address(amznStock)), helper, 0, 0, 0,
+            address(this));
 
         // Register AAPL + NVDA. AMZN stays unregistered on purpose.
         dclexRouter.addPool(
@@ -153,8 +156,8 @@ contract Regression_AuditFixes is Test, TestBalance {
         dusdToken.approve(address(aaplPool), 100000e6);
         dusdToken.approve(address(nvdaPool), 100000e6);
         vm.stopPrank();
-        aaplPool.initialize(100 ether, 2000e6, PRICE_DATA);
-        nvdaPool.initialize(100 ether, 2000e6, PRICE_DATA);
+        aaplPool.initialize(100 ether, 2000e6, address(this), PRICE_DATA);
+        nvdaPool.initialize(100 ether, 2000e6, address(this), PRICE_DATA);
 
         vm.deal(address(this), 1 ether);
 
@@ -207,6 +210,7 @@ contract Regression_AuditFixes is Test, TestBalance {
             0,
             0,
             0,
+            ADMIN,
             ADMIN
         );
         // Sanity: stock side genuinely matches, so we isolate the stablecoin check.
@@ -395,6 +399,7 @@ contract Regression_AuditFixes is Test, TestBalance {
             0,
             0,
             0,
+            ADMIN,
             ADMIN
         );
         assertEq(address(mismatchedPool.stockToken()), address(amznStock));

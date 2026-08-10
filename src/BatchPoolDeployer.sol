@@ -48,11 +48,15 @@ contract BatchPoolDeployer {
         IPriceOracle oracle;
         address[] stockAddresses;
         address finalOwner;
+        /// @dev Holds INITIALIZER_ROLE on every pool this call deploys. Seeding
+        ///      happens in a later phase, so this is not necessarily the caller.
+        address initializer;
     }
 
     function deployAllPools(DeployParams calldata params) external {
         if (msg.sender != deployer) revert BatchPoolDeployer__Unauthorized();
         if (params.finalOwner == address(0)) revert BatchPoolDeployer__ZeroAddress();
+        if (params.initializer == address(0)) revert BatchPoolDeployer__ZeroAddress();
         params.router.acceptOwnership();
         DigitalIdentity digitalIdentity = DigitalIdentity(address(params.factory.getDID()));
         digitalIdentity.mintAdmin(address(params.router), 2, bytes32(0));
@@ -70,7 +74,8 @@ contract BatchPoolDeployer {
                 feeCurveA,
                 feeCurveB,
                 DEFAULT_PROTOCOL_FEE_RATE,
-                params.finalOwner
+                params.finalOwner,
+                params.initializer
             );
 
             params.router.addPool(
