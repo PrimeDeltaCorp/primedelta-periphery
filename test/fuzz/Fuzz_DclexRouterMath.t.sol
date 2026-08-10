@@ -172,8 +172,10 @@ contract Fuzz_DclexRouterMath is Test {
         // swap math is identical once their reserves match.
         router = new DclexRouter(IERC20(address(dusd)));
         DeployDclexPool poolDeployer = new DeployDclexPool();
-        routerPool = poolDeployer.deploy(IStock(address(aapl)), helperConfig, 0, 0, 0);
-        refPool = poolDeployer.deploy(IStock(address(aapl)), helperConfig, 0, 0, 0);
+        routerPool = poolDeployer.deploy(IStock(address(aapl)), helperConfig, 0, 0, 0,
+            address(this));
+        refPool = poolDeployer.deploy(IStock(address(aapl)), helperConfig, 0, 0, 0,
+            address(this));
 
         router.addPool(address(aapl), DclexRouter.PoolType.DCLEX, address(routerPool), 0);
 
@@ -203,8 +205,8 @@ contract Fuzz_DclexRouterMath is Test {
         aapl.approve(address(refPool), type(uint256).max);
         dusd.approve(address(routerPool), type(uint256).max);
         dusd.approve(address(refPool), type(uint256).max);
-        routerPool.initialize(STOCK_LIQ, DUSD_LIQ, EMPTY);
-        refPool.initialize(STOCK_LIQ, DUSD_LIQ, EMPTY);
+        routerPool.initialize(STOCK_LIQ, DUSD_LIQ, address(this), EMPTY);
+        refPool.initialize(STOCK_LIQ, DUSD_LIQ, address(this), EMPTY);
 
         // Router user approvals (the pool callback pulls the user's input via
         // the router → allowance is user→router).

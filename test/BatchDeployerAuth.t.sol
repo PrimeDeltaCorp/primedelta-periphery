@@ -8,6 +8,8 @@ import {DclexRouter} from "src/DclexRouter.sol";
 import {Factory} from "dclex-blockchain/contracts/dclex/Factory.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPriceOracle} from "dclex-protocol/src/IPriceOracle.sol";
+import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
+import {USDCMock} from "dclex-blockchain/contracts/mocks/USDCMock.sol";
 import {DigitalIdentity} from "dclex-blockchain/contracts/dclex/DigitalIdentity.sol";
 import {DeployDclex} from "dclex-protocol/script/DeployDclex.s.sol";
 
@@ -23,7 +25,8 @@ contract BatchDeployerAuthTest is Test {
             dusdToken: IERC20(address(0)),
             oracle: IPriceOracle(address(0)),
             stockAddresses: new address[](0),
-            finalOwner: address(0)
+            finalOwner: address(0),
+            initializer: address(0xbeef)
         });
         vm.prank(attacker);
         vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__Unauthorized.selector);
@@ -42,7 +45,8 @@ contract BatchDeployerAuthTest is Test {
                 priceUpdateData: new bytes[](0),
                 stockAmount: 0,
                 dusdAmount: 0,
-                feePerPool: 0
+                feePerPool: 0,
+                lpRecipient: address(this)
             });
         vm.prank(attacker);
         vm.expectRevert(FIOraclePoolBatchInitializer.FIOraclePoolBatchInitializer__Unauthorized.selector);
@@ -57,7 +61,8 @@ contract BatchDeployerAuthTest is Test {
             dusdToken: IERC20(address(0)),
             oracle: IPriceOracle(address(0)),
             stockAddresses: new address[](0),
-            finalOwner: address(0)
+            finalOwner: address(0),
+            initializer: address(0xbeef)
         });
         vm.prank(authorized);
         vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__ZeroAddress.selector);
@@ -88,7 +93,8 @@ contract BatchDeployerAuthTest is Test {
             dusdToken: IERC20(address(0xdead)),
             oracle: IPriceOracle(address(0xbeef)),
             stockAddresses: new address[](0),
-            finalOwner: admin
+            finalOwner: admin,
+            initializer: address(this)
         }));
 
         assertFalse(
@@ -160,7 +166,8 @@ contract BatchDeployerAuthTest is Test {
             dusdToken: IERC20(address(0xdead)),
             oracle: IPriceOracle(address(0xbeef)),
             stockAddresses: new address[](0),
-            finalOwner: finalOwner
+            finalOwner: finalOwner,
+            initializer: address(this)
         }));
 
         assertEq(router.owner(), address(batch), "batch did not accept ownership");
@@ -190,13 +197,96 @@ contract BatchDeployerAuthTest is Test {
                 priceUpdateData: new bytes[](0),
                 stockAmount: 0,
                 dusdAmount: 0,
-                feePerPool: 0
+                feePerPool: 0,
+                lpRecipient: address(this)
             })
         );
 
         assertFalse(
             factory.hasRole(0x00, address(batchInit)),
             "initializeAll must drop its Factory admin on the way out"
+        );
+    }
+
+    function testDeployAllPoolsRejectsZeroInitializer() external {
+        BatchPoolDeployer batch = new BatchPoolDeployer(authorized);
+        BatchPoolDeployer.DeployParams memory p = BatchPoolDeployer.DeployParams({
+            router: DclexRouter(payable(address(0))),
+            factory: Factory(address(0)),
+            dusdToken: IERC20(address(0)),
+            oracle: IPriceOracle(address(0)),
+            stockAddresses: new address[](0),
+            finalOwner: makeAddr("final_owner_zi"),
+            initializer: address(0)
+        });
+        vm.prank(authorized);
+        vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__ZeroAddress.selector);
+        batch.deployAllPools(p);
+    }
+
+    function testDeployAllPoolsGrantsTheSeedingRoleToTheNamedInitializer() external {
+        address master = makeAddr("master_admin5");
+        address admin = makeAddr("admin5");
+        address seeder = makeAddr("seeder5");
+        DeployDclex deployer = new DeployDclex();
+        DeployDclex.DclexContracts memory contracts = deployer.run(admin, master);
+
+        vm.prank(admin);
+        string[] memory names = new string[](1);
+        string[] memory symbols = new string[](1);
+        names[0] = "Apple";
+        symbols[0] = "AAPL";
+        contracts.stocksFactory.createStocks(names, symbols);
+        address stock = contracts.stocksFactory.stocks("AAPL");
+
+        USDCMock dusd = new USDCMock("dUSD", "dUSD");
+        DclexRouter router = new DclexRouter(IERC20(address(dusd)));
+        BatchPoolDeployer batch = new BatchPoolDeployer(address(this));
+        router.transferOwnership(address(batch));
+        vm.prank(master);
+        contracts.digitalIdentity.grantRole(0x00, address(batch));
+
+        address[] memory stocks = new address[](1);
+        stocks[0] = stock;
+        batch.deployAllPools(BatchPoolDeployer.DeployParams({
+            router: router,
+            factory: contracts.stocksFactory,
+            dusdToken: IERC20(address(dusd)),
+            oracle: IPriceOracle(address(0xbeef)),
+            stockAddresses: stocks,
+            finalOwner: admin,
+            initializer: seeder
+        }));
+
+        DclexPool pool = DclexPool(router.stockToDclexPool(stock));
+        assertTrue(
+            pool.hasRole(pool.INITIALIZER_ROLE(), seeder),
+            "the named initializer must be able to seed"
+        );
+        assertFalse(
+            pool.hasRole(pool.INITIALIZER_ROLE(), address(batch)),
+            "the deployer must not keep the seeding role"
+        );
+    }
+
+    function testInitializeAllRejectsZeroLpRecipient() external {
+        FIOraclePoolBatchInitializer batchInit =
+            new FIOraclePoolBatchInitializer(address(this));
+        vm.expectRevert(
+            FIOraclePoolBatchInitializer.FIOraclePoolBatchInitializer__ZeroAddress.selector
+        );
+        batchInit.initializeAll(
+            FIOraclePoolBatchInitializer.InitParams({
+                factory: Factory(address(0)),
+                dusdToken: IERC20(address(0)),
+                pools: new address[](0),
+                stockSymbols: new string[](0),
+                priceUpdateData: new bytes[](0),
+                stockAmount: 0,
+                dusdAmount: 0,
+                feePerPool: 0,
+                lpRecipient: address(0)
+            })
         );
     }
 }

@@ -43,10 +43,13 @@ contract FIOraclePoolBatchInitializer {
         uint256 stockAmount;
         uint256 dusdAmount;
         uint256 feePerPool;
+        /// @dev Receives the genesis LP of every pool seeded in this call.
+        address lpRecipient;
     }
 
     function initializeAll(InitParams calldata p) external payable {
         if (msg.sender != authorizedCaller) revert FIOraclePoolBatchInitializer__Unauthorized();
+        if (p.lpRecipient == address(0)) revert FIOraclePoolBatchInitializer__ZeroAddress();
         require(p.pools.length == p.stockSymbols.length, "len mismatch");
         require(p.pools.length == p.priceUpdateData.length, "len mismatch");
 
@@ -60,7 +63,12 @@ contract FIOraclePoolBatchInitializer {
 
             bytes[] memory data = new bytes[](1);
             data[0] = p.priceUpdateData[i];
-            pool.initialize{value: p.feePerPool}(p.stockAmount, p.dusdAmount, data);
+            pool.initialize{value: p.feePerPool}(
+                p.stockAmount,
+                p.dusdAmount,
+                p.lpRecipient,
+                data
+            );
         }
 
         if (address(this).balance > 0) {

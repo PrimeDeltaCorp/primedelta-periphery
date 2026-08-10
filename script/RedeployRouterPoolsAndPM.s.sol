@@ -233,7 +233,11 @@ contract RedeployRouterPoolsAndPM is Script {
                 DEFAULT_FEE_CURVE_A,
                 DEFAULT_FEE_CURVE_B,
                 DEFAULT_PROTOCOL_FEE_RATE,
-                cfg.admin
+                cfg.admin,
+                // Under SKIP_INIT phase 3 never runs, so the batch initializer
+                // would hold a seeding role it can never use while the admin —
+                // who runs initialize-dclex-pools.sh later — holds none.
+                vm.envOr("SKIP_INIT", false) ? cfg.admin : address(ph.batchInit)
             );
             ph.pools[i] = address(pool);
         }
@@ -334,6 +338,11 @@ contract RedeployRouterPoolsAndPM is Script {
                 priceUpdateData: priceUpdateData,
                 stockAmount:     STOCK_AMOUNT,
                 dusdAmount:      DUSD_AMOUNT,
+                // Dev only — phase 3 is skipped on testnet and mainnet, which seed
+                // via initialize-dclex-pools.sh with an explicit LP_RECIPIENT.
+                // TODO(OOS-01): the helper cannot transfer, so the dev genesis LP
+                // stays locked in it; that is the pre-existing behaviour.
+                lpRecipient:     address(ph.batchInit),
                 feePerPool:      INITIAL_UPDATE_FEE
             })
         );

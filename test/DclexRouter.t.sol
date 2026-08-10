@@ -148,21 +148,24 @@ contract DclexRouterTest is Test, TestBalance {
             dclexProtocolHelperConfig,
             0,
             0,
-            0
+            0,
+            address(this)
         );
         nvdaPool = dclexPoolDeployer.run(
             IStock(address(nvdaStock)),
             dclexProtocolHelperConfig,
             0,
             0,
-            0
+            0,
+            address(this)
         );
         amznPool = dclexPoolDeployer.run(
             IStock(address(amznStock)),
             dclexProtocolHelperConfig,
             0,
             0,
-            0
+            0,
+            address(this)
         );
 
         // Register pools. amznStock is intentionally NOT registered — it's
@@ -188,8 +191,8 @@ contract DclexRouterTest is Test, TestBalance {
         dusdToken.approve(address(aaplPool), 100000e6);
         dusdToken.approve(address(nvdaPool), 100000e6);
         vm.stopPrank();
-        aaplPool.initialize(100 ether, 2000e6, PRICE_DATA);
-        nvdaPool.initialize(100 ether, 2000e6, PRICE_DATA);
+        aaplPool.initialize(100 ether, 2000e6, address(this), PRICE_DATA);
+        nvdaPool.initialize(100 ether, 2000e6, address(this), PRICE_DATA);
 
         // Add liquidity to V3 ETH/USDC pool
         _addV3Liquidity();

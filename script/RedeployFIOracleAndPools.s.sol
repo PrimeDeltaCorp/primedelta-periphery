@@ -86,6 +86,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
                 0.0005 ether,
                 0.0005 ether,
                 0.15 ether, // protocol-fee cut baked at deploy (#256)
+                ADMIN,
                 ADMIN
             );
             newPools[i] = address(pool);

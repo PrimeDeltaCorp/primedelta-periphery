@@ -107,7 +107,7 @@ contract DeployRouterWithPools is Script {
         did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
         batch.deployAllPools(BatchPoolDeployer.DeployParams(
             router, p.stocksFactory, cfg.dusdToken, cfg.oracle,
-            stocks, p.admin
+            stocks, p.admin, p.admin
         ));
         did.revokeRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
 

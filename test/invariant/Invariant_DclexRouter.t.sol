@@ -404,8 +404,10 @@ contract Invariant_DclexRouter is StdInvariant, Test {
         router = new DclexRouter(IERC20(address(dusd)));
 
         DeployDclexPool poolDeployer = new DeployDclexPool();
-        aaplPool = poolDeployer.run(IStock(address(aaplStock)), helperConfig, 0, 0, 0);
-        nvdaPool = poolDeployer.run(IStock(address(nvdaStock)), helperConfig, 0, 0, 0);
+        aaplPool = poolDeployer.run(IStock(address(aaplStock)), helperConfig, 0, 0, 0,
+            address(this));
+        nvdaPool = poolDeployer.run(IStock(address(nvdaStock)), helperConfig, 0, 0, 0,
+            address(this));
 
         router.addPool(address(aaplStock), DclexRouter.PoolType.DCLEX, address(aaplPool), 0);
         router.addPool(address(nvdaStock), DclexRouter.PoolType.DCLEX, address(nvdaPool), 0);
@@ -420,8 +422,8 @@ contract Invariant_DclexRouter is StdInvariant, Test {
 
         // ---- this contract seeds pool liquidity as the initial LP ----
         _fundAndApprovePools(address(this));
-        aaplPool.initialize(STOCK_LIQ, DUSD_LIQ, EMPTY);
-        nvdaPool.initialize(STOCK_LIQ, DUSD_LIQ, EMPTY);
+        aaplPool.initialize(STOCK_LIQ, DUSD_LIQ, address(this), EMPTY);
+        nvdaPool.initialize(STOCK_LIQ, DUSD_LIQ, address(this), EMPTY);
 
         // ---- deploy + fund the fuzz actor ----
         handler = new DclexRouterHandler(
