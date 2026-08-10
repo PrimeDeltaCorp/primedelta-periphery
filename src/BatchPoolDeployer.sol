@@ -52,6 +52,8 @@ contract BatchPoolDeployer {
 
     function deployAllPools(DeployParams calldata params) external {
         if (msg.sender != deployer) revert BatchPoolDeployer__Unauthorized();
+        if (params.finalOwner == address(0)) revert BatchPoolDeployer__ZeroAddress();
+        params.router.acceptOwnership();
         DigitalIdentity digitalIdentity = DigitalIdentity(address(params.factory.getDID()));
         digitalIdentity.mintAdmin(address(params.router), 2, bytes32(0));
 

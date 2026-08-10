@@ -96,7 +96,8 @@ contract RedeployRouter is Script {
         console.log("Registered", tokens.length, "pools");
 
         newRouter.transferOwnership(ADMIN);
-        console.log("Ownership transferred to:", ADMIN);
+        console.log("Ownership transfer PENDING for:", ADMIN);
+        console.log("ACTION REQUIRED: that address must call acceptOwnership()");
 
         // Router needs a DID because it acts as intermediary for dUSD
         // in stock-to-stock swaps (receives from pool A, sends to pool B)

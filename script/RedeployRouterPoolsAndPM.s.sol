@@ -211,8 +211,10 @@ contract RedeployRouterPoolsAndPM is Script {
 
         _deployPools(ph, cfg, stocks);
 
-        // Hand router ownership to admin so admin can configure pools/V3 in phase 2.
+        // Hand router ownership to admin. Ownable2Step: this only sets
+        // pendingOwner; _phase2Configure claims it as its first admin call.
         ph.router.transferOwnership(cfg.admin);
+        console.log("Router ownership pending for admin:", cfg.admin);
         vm.stopBroadcast();
     }
 
@@ -249,6 +251,10 @@ contract RedeployRouterPoolsAndPM is Script {
         Factory factory = Factory(cfg.factory);
 
         vm.startBroadcast(adminKey);
+
+        // Ownable2Step: phase 1 only set pendingOwner. Claim it here or every
+        // onlyOwner call below reverts OwnableUnauthorizedAccount.
+        ph.router.acceptOwnership();
 
         did.mintAdmin(address(ph.router), 2, bytes32(0));
         did.mintAdmin(address(ph.npm), 2, bytes32(0));

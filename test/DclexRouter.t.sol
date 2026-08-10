@@ -204,7 +204,8 @@ contract DclexRouterTest is Test, TestBalance {
 
         // Transfer ownership to admin
         dclexRouter.transferOwnership(ADMIN);
-        ADMIN = dclexRouter.owner();
+        vm.prank(ADMIN);
+        dclexRouter.acceptOwnership();
     }
 
     function testRouterAcceptsEmptyCalldataNativeRefund() external {
@@ -1608,16 +1609,18 @@ contract DclexRouterTest is Test, TestBalance {
     /// @notice Defense against the cross-callback abuse vector: mid-V3-swap,
     /// the V3 sentinel is set but the DCLEX sentinel is not — a malicious
     /// V3 pool firing `dclexSwapCallback` from inside its own `swap` must
-    /// still revert. Storage slot 6 = `_expectedDclexCallbackPool`,
-    /// slot 7 = `_expectedV3CallbackPool` (forge inspect storage-layout).
+    /// still revert. The two sentinel slots are pinned by
+    /// StorageLayoutGuard — read the constants there rather than trusting a
+    /// number written here, since the layout shifts whenever a state variable
+    /// is added above them.
     function testDclexCallbackRevertsWhileOnlyV3SentinelSet() external {
         address fakeV3Pool = address(0xBEEF);
         // Poke V3 sentinel only — simulate mid-V3-swap state.
-        vm.store(address(dclexRouter), bytes32(uint256(7)), bytes32(uint256(uint160(fakeV3Pool))));
+        vm.store(address(dclexRouter), bytes32(uint256(8)), bytes32(uint256(uint160(fakeV3Pool))));
 
-        // Positive control: writing slot 7 must actually wire
+        // Positive control: this write must actually wire
         // `_expectedV3CallbackPool` (catches silent storage-layout drift).
-        // Call the V3 callback from fakeV3Pool — if slot 7 is the V3 sentinel,
+        // Call the V3 callback from fakeV3Pool — if the write hit the V3 sentinel,
         // the modifier passes and execution proceeds to the next check
         // (`stockToV3Pool[ctx.v3Token] != msg.sender` → InvalidCallback).
         // If layout drifted, modifier reverts with UnexpectedCallback instead.
@@ -1635,7 +1638,7 @@ contract DclexRouterTest is Test, TestBalance {
             assertFalse(ok, "expected revert past the modifier");
             assertTrue(
                 bytes4(ret) != DclexRouter.DclexRouter__UnexpectedCallback.selector,
-                "slot 7 must be wired to _expectedV3CallbackPool (storage-layout sanity)"
+                "write must be wired to _expectedV3CallbackPool (storage-layout sanity)"
             );
         }
 
@@ -1654,13 +1657,13 @@ contract DclexRouterTest is Test, TestBalance {
     function testV3CallbackRevertsWhileOnlyDclexSentinelSet() external {
         address fakeDclexPool = address(0xCAFE);
         // Poke DCLEX sentinel only.
-        vm.store(address(dclexRouter), bytes32(uint256(6)), bytes32(uint256(uint160(fakeDclexPool))));
+        vm.store(address(dclexRouter), bytes32(uint256(7)), bytes32(uint256(uint160(fakeDclexPool))));
 
-        // Positive control: writing slot 6 must actually wire
+        // Positive control: this write must actually wire
         // `_expectedDclexCallbackPool`. Call the DCLEX callback from
         // fakeDclexPool — modifier passes, execution proceeds to
         // safeTransferFrom which reverts on missing allowance. As long as
-        // the revert is NOT UnexpectedCallback, slot 7 is correctly mapped.
+        // the revert is NOT UnexpectedCallback, the sentinel is correctly mapped.
         {
             bytes memory dclexData = abi.encode(
                 DclexRouter.DclexSwapCallbackData(USER_1, false, address(0), 0)
@@ -1675,7 +1678,7 @@ contract DclexRouterTest is Test, TestBalance {
             assertFalse(ok, "expected revert past the modifier");
             assertTrue(
                 bytes4(ret) != DclexRouter.DclexRouter__UnexpectedCallback.selector,
-                "slot 6 must be wired to _expectedDclexCallbackPool (storage-layout sanity)"
+                "write must be wired to _expectedDclexCallbackPool (storage-layout sanity)"
             );
         }
 

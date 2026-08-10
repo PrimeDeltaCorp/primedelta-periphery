@@ -157,7 +157,8 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
 
         // Transfer ownership to admin
         dclexRouter.transferOwnership(ADMIN);
-        ADMIN = dclexRouter.owner();
+        vm.prank(ADMIN);
+        dclexRouter.acceptOwnership();
     }
 
     function _deployV3Infrastructure() private {

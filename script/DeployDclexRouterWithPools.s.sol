@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
 import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
 import {
@@ -112,6 +112,8 @@ contract DeployRouterWithPools is Script {
         did.revokeRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
 
         vm.stopBroadcast();
+        console.log("Router ownership PENDING for admin:", p.admin);
+        console.log("ACTION REQUIRED: admin must acceptOwnership() on the router");
         return router;
     }
 

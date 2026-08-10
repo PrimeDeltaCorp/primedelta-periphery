@@ -6,6 +6,7 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
 import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
@@ -18,7 +19,7 @@ import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 /// @title DclexRouter
 /// @notice Unified router for dual-DEX: DCLEX oracle pools + Uniswap V3 pools.
 /// @dev wDEL is treated as a normal V3 token — wrapping/unwrapping is frontend responsibility.
-contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3SwapCallback {
+contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUniswapV3SwapCallback {
     using SafeERC20 for IERC20;
 
     error DclexRouter__InputTooHigh();
@@ -35,6 +36,7 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
     error DclexRouter__OracleMismatch();
     error DclexRouter__NotAContract();
     error DclexRouter__PoolsStillRegistered();
+    error DclexRouter__RenounceDisabled();
 
     enum PoolType {
         NONE,
@@ -178,6 +180,20 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
             delete stockToFeeTier[token];
         }
         stockPoolType[token] = PoolType.NONE;
+    }
+
+    /// @notice Disabled. The owner controls the pool registry and ETH
+    ///         recovery, so dropping ownership would strand the router.
+    function renounceOwnership() public view override onlyOwner {
+        revert DclexRouter__RenounceDisabled();
+    }
+
+    /// @dev Ownable2Step accepts address(0) to cancel a pending transfer,
+    ///      which would silently drop the zero-address guard plain Ownable
+    ///      enforced. Keep rejecting it.
+    function transferOwnership(address newOwner) public override onlyOwner {
+        if (newOwner == address(0)) revert DclexRouter__ZeroAddress();
+        super.transferOwnership(newOwner);
     }
 
     /// @notice Repoint the expected DCLEX oracle after an FIOracle redeploy.

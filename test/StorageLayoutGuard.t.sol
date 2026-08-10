@@ -10,7 +10,7 @@ import "forge-std/Test.sol";
 /// Why this test exists (read before changing):
 /// - `DclexRouter.t.sol::test{Dclex,V3}CallbackRevertsWhileOnly*SentinelSet`
 ///   guard cross-callback isolation by `vm.store`-ing a fake pool into the
-///   sentinel slots (6 and 7) and asserting the wiring took effect. Those are
+///   the sentinel slots and asserting the wiring took effect. Those are
 ///   hardcoded slot literals — if the storage layout drifts (an OZ repin, a
 ///   new state variable, a reorder) the literals silently point at the wrong
 ///   slot and the "sanity" tests stop testing what they claim to.
@@ -21,8 +21,8 @@ import "forge-std/Test.sol";
 ///   behavioral guards into no-ops.
 /// - No FFI: the artifact is read from ./out (already in fs_permissions).
 contract StorageLayoutGuardTest is Test {
-    uint256 internal constant DCLEX_SENTINEL_SLOT = 6;
-    uint256 internal constant V3_SENTINEL_SLOT = 7;
+    uint256 internal constant DCLEX_SENTINEL_SLOT = 7;
+    uint256 internal constant V3_SENTINEL_SLOT = 8;
 
     function test_sentinelSlotsMatchCompiledLayout() public view {
         string memory json = vm.readFile("out/DclexRouter.sol/DclexRouter.json");

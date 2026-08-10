@@ -160,6 +160,8 @@ contract Regression_AuditFixes is Test, TestBalance {
 
         // Hand ownership to ADMIN — matches production + the periphery harness.
         dclexRouter.transferOwnership(ADMIN);
+        vm.prank(ADMIN);
+        dclexRouter.acceptOwnership();
     }
 
     function _setupAccount(address account) private {
@@ -487,5 +489,39 @@ contract Regression_AuditFixes is Test, TestBalance {
         vm.prank(ADMIN);
         dclexRouter.removePool(address(aaplStock), DclexRouter.PoolType.DCLEX);
         assertEq(dclexRouter.dclexPoolCount(), 1);
+    }
+
+    function test_L01_RenounceOwnershipDisabled() external {
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__RenounceDisabled.selector);
+        dclexRouter.renounceOwnership();
+
+        assertEq(dclexRouter.owner(), ADMIN, "owner must survive a renounce attempt");
+    }
+
+    function test_L01_TransferOwnershipRejectsZeroAddress() external {
+        vm.prank(ADMIN);
+        vm.expectRevert(DclexRouter.DclexRouter__ZeroAddress.selector);
+        dclexRouter.transferOwnership(address(0));
+
+        assertEq(dclexRouter.owner(), ADMIN);
+    }
+
+    function test_L01_OwnershipTransferRequiresAcceptance() external {
+        address newOwner = makeAddr("new_router_owner");
+
+        vm.prank(ADMIN);
+        dclexRouter.transferOwnership(newOwner);
+        assertEq(dclexRouter.owner(), ADMIN, "owner must not change before acceptance");
+        assertEq(dclexRouter.pendingOwner(), newOwner);
+
+        vm.prank(USER_1);
+        vm.expectRevert();
+        dclexRouter.acceptOwnership();
+
+        vm.prank(newOwner);
+        dclexRouter.acceptOwnership();
+        assertEq(dclexRouter.owner(), newOwner);
+        assertEq(dclexRouter.pendingOwner(), address(0));
     }
 }
