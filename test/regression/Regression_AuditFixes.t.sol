@@ -552,4 +552,5 @@ contract Regression_AuditFixes is Test, TestBalance {
         dclexRouter.removePool(address(nvdaStock), DclexRouter.PoolType.DCLEX);
         assertEq(dclexRouter.allStockTokens().length, 0);
     }
+
 }

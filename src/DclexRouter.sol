@@ -9,6 +9,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
 import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
 import {IDclexSwapCallback} from "dclex-protocol/src/IDclexSwapCallback.sol";
@@ -804,7 +805,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
         // against ctx.maxInputAmount — no extra check needed here.
         if (inputType == PoolType.V3) {
             (inputUsed, ) = _v3Swap(
-                -int256(stablecoinAmount),
+                -SafeCast.toInt256(stablecoinAmount),
                 data.inputToken,
                 dclexPool,
                 V3SwapCallbackData({
@@ -844,7 +845,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
         }
 
         (, uint256 outAmount) = _v3Swap(
-            -int256(exactOutputAmount),
+            -SafeCast.toInt256(exactOutputAmount),
             address(stablecoin),
             payer,
             V3SwapCallbackData({
@@ -978,7 +979,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
         // ctx.maxInputAmount itself.
         if (inputType == PoolType.V3) {
             _v3Swap(
-                -int256(stablecoinAmount),
+                -SafeCast.toInt256(stablecoinAmount),
                 ctx.inputToken,
                 recipient,
                 V3SwapCallbackData({
@@ -1061,7 +1062,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     ) private returns (uint256 stableOut) {
         uint256 stockUsed;
         (stockUsed, stableOut) = _v3Swap(
-            int256(amount),
+            SafeCast.toInt256(amount),
             token,
             address(this),
             _routerCtxForV3(token, token, amount)
@@ -1076,7 +1077,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     ) private returns (uint256 stockOut) {
         uint256 stablecoinUsed;
         (stablecoinUsed, stockOut) = _v3Swap(
-            int256(stablecoinAmount),
+            SafeCast.toInt256(stablecoinAmount),
             address(stablecoin),
             recipient,
             _routerCtxForV3(token, address(stablecoin), stablecoinAmount)
@@ -1092,7 +1093,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     ) private returns (uint256 stockUsed) {
         uint256 stablecoinOut;
         (stockUsed, stablecoinOut) = _v3Swap(
-            -int256(stablecoinAmount),
+            -SafeCast.toInt256(stablecoinAmount),
             token,
             recipient,
             _routerCtxForV3(token, token, maxInputAmount)
@@ -1108,7 +1109,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     ) private returns (uint256 stableUsed) {
         uint256 tokenOut;
         (stableUsed, tokenOut) = _v3Swap(
-            -int256(tokenAmount),
+            -SafeCast.toInt256(tokenAmount),
             address(stablecoin),
             recipient,
             _routerCtxForV3(token, address(stablecoin), maxStablecoinAmount)
