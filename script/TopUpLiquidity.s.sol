@@ -48,17 +48,37 @@ contract TopUpLiquidity is DclexStockList {
                 console.log("skip (uninitialized)", stocks[i].symbol);
                 continue;
             }
-            address stockAddr = factory.stocks(stocks[i].symbol);
-            // addLiquidity pulls MULTIPLIER * reserve (Ceil) of each side; mint
-            // exactly that + a small buffer for the rounding.
-            (uint256 stockReserve, uint256 dusdReserve18) = pool.getReserves();
-            factory.forceMintStocks(stocks[i].symbol, admin, MULTIPLIER * stockReserve + 1e18);
-            factory.forceMintStablecoin(dusdSymbol, admin, MULTIPLIER * (dusdReserve18 / 1e12) + 1e6);
-            IERC20(stockAddr).approve(pools[i], type(uint256).max);
-            dusd.approve(pools[i], type(uint256).max);
-            pool.addLiquidity(supply * MULTIPLIER);
+            _topUpPool(pool, factory, dusd, stocks[i].symbol, dusdSymbol, admin);
         }
         vm.stopBroadcast();
         console.log("Liquidity topped up (NFLX skipped).");
+    }
+
+    /// @dev Split out of the loop to keep `run()` under the stack limit.
+    function _topUpPool(
+        DclexPool pool,
+        Factory factory,
+        IERC20 dusd,
+        string memory symbol,
+        string memory dusdSymbol,
+        address admin
+    ) private {
+        // addLiquidity pulls MULTIPLIER * reserve (Ceil) of each side; mint
+        // exactly that + a small buffer for the rounding, and pass the same
+        // figures as the bounds so a shifted reserve ratio reverts here
+        // rather than pulling more than was minted.
+        (uint256 stockReserve, uint256 dusdReserve18) = pool.getReserves();
+        uint256 maxStockIn = MULTIPLIER * stockReserve + 1e18;
+        uint256 maxStablecoinIn = MULTIPLIER * (dusdReserve18 / 1e12) + 1e6;
+        factory.forceMintStocks(symbol, admin, maxStockIn);
+        factory.forceMintStablecoin(dusdSymbol, admin, maxStablecoinIn);
+        IERC20(factory.stocks(symbol)).approve(address(pool), type(uint256).max);
+        dusd.approve(address(pool), type(uint256).max);
+        pool.addLiquidity(
+            pool.totalSupply() * MULTIPLIER,
+            maxStockIn,
+            maxStablecoinIn,
+            block.timestamp + 15 minutes
+        );
     }
 }
