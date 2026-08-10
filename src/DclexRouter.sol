@@ -40,6 +40,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     error DclexRouter__NotAContract();
     error DclexRouter__PoolsStillRegistered();
     error DclexRouter__RenounceDisabled();
+    error DclexRouter__SameToken();
 
     enum PoolType {
         NONE,
@@ -541,6 +542,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
         uint256 deadline,
         bytes[] calldata priceUpdateData
     ) external payable nonReentrant checkDeadline(deadline) refundETH {
+        if (inputToken == outputToken) revert DclexRouter__SameToken();
         if (
             inputToken == address(stablecoin) || outputToken == address(stablecoin)
         ) {
@@ -643,6 +645,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
         uint256 deadline,
         bytes[] calldata priceUpdateData
     ) external payable nonReentrant checkDeadline(deadline) refundETH {
+        if (inputToken == outputToken) revert DclexRouter__SameToken();
         if (
             inputToken == address(stablecoin) || outputToken == address(stablecoin)
         ) {
