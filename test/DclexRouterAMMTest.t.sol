@@ -980,4 +980,167 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
         console.log("  Max input:", maxInput / 1e18);
         console.log("  AMMT2 spent:", ammt2Spent / 1e18);
     }
+
+    function _createBoundedRangeV3Pool(
+        string memory symbol,
+        uint256 priceUsd,
+        uint256 stockAmount,
+        uint256 usdcAmount,
+        int24 bandSteps
+    ) private returns (Stock stock, address poolAddress) {
+        {
+            string[] memory names = new string[](1);
+            string[] memory symbols = new string[](1);
+            names[0] = symbol;
+            symbols[0] = symbol;
+            vm.prank(ADMIN);
+            stocksFactory.createStocks(names, symbols);
+        }
+        stock = Stock(stocksFactory.stocks(symbol));
+
+        poolAddress = v3Factory.createPool(
+            address(stock),
+            address(dusdToken),
+            FEE_TIER
+        );
+        _initializePool(poolAddress, address(stock), priceUsd);
+
+        vm.prank(ADMIN);
+        digitalIdentity.mintAdmin(poolAddress, 0, bytes32(0));
+        vm.prank(ADMIN);
+        stocksFactory.forceMintStocks(symbol, address(this), stockAmount);
+        dusdToken.mint(address(this), usdcAmount);
+
+        _mintBoundedBand(
+            poolAddress,
+            address(stock),
+            stockAmount,
+            usdcAmount,
+            bandSteps
+        );
+
+        vm.prank(dclexRouter.owner());
+        dclexRouter.addPool(address(stock), DclexRouter.PoolType.V3, poolAddress, FEE_TIER);
+    }
+
+    function _mintBoundedBand(
+        address poolAddress,
+        address stockToken,
+        uint256 stockAmount,
+        uint256 usdcAmount,
+        int24 bandSteps
+    ) private {
+        IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
+        bool stockIsToken0 = stockToken < address(dusdToken);
+
+        _mintCallbackData = MintCallbackData({
+            pool: poolAddress,
+            token0: stockIsToken0 ? stockToken : address(dusdToken),
+            token1: stockIsToken0 ? address(dusdToken) : stockToken
+        });
+
+        int24 tickLower;
+        int24 tickUpper;
+        {
+            (, int24 currentTick, , , , , ) = pool.slot0();
+            int24 aligned = (currentTick / 60) * 60;
+            tickLower = aligned - 60 * bandSteps;
+            tickUpper = aligned + 60 * bandSteps;
+        }
+
+        uint128 liquidity;
+        {
+            (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+            liquidity = LiquidityAmounts.getLiquidityForAmounts(
+                sqrtPriceX96,
+                TickMath.getSqrtRatioAtTick(tickLower),
+                TickMath.getSqrtRatioAtTick(tickUpper),
+                stockIsToken0 ? stockAmount : usdcAmount,
+                stockIsToken0 ? usdcAmount : stockAmount
+            );
+        }
+
+        pool.mint(address(this), tickLower, tickUpper, liquidity, "");
+    }
+
+    function test_H01_BuyExactOutput_V3_RevertsOnPartialFill() public {
+        (Stock stock, address pool) = _createBoundedRangeV3Pool(
+            "AMMT3", 20e6, 10e18, 200e6, 2
+        );
+
+        uint256 poolStock = stock.balanceOf(pool);
+        uint256 exactOut = poolStock * 50;
+        uint256 maxIn = 1_000_000e6;
+
+        dusdToken.mint(USER_1, maxIn);
+        vm.startPrank(USER_1);
+        dusdToken.approve(address(dclexRouter), maxIn);
+        vm.expectRevert(DclexRouter.DclexRouter__NoLiquidity.selector);
+        dclexRouter.buyExactOutput(
+            address(stock),
+            exactOut,
+            maxIn,
+            block.timestamp + 1,
+            new bytes[](0)
+        );
+        vm.stopPrank();
+    }
+
+    function test_H01_SellExactOutput_V3_RevertsOnPartialFill() public {
+        (Stock stock, address pool) = _createBoundedRangeV3Pool(
+            "AMMT4", 20e6, 10e18, 200e6, 2
+        );
+
+        uint256 poolStable = dusdToken.balanceOf(pool);
+        uint256 exactOut = poolStable * 50;
+        uint256 maxIn = 1_000_000e18;
+
+        vm.prank(ADMIN);
+        stocksFactory.forceMintStocks("AMMT4", USER_1, maxIn);
+        vm.startPrank(USER_1);
+        stock.approve(address(dclexRouter), maxIn);
+        vm.expectRevert(DclexRouter.DclexRouter__NoLiquidity.selector);
+        dclexRouter.sellExactOutput(
+            address(stock),
+            exactOut,
+            maxIn,
+            block.timestamp + 1,
+            new bytes[](0)
+        );
+        vm.stopPrank();
+    }
+
+    function test_H01_BuyExactOutput_V3_AmpleLiquidityUnaffected() public {
+        uint256 exactOut = 1e18;
+        uint256 maxIn = 1000e6;
+        uint256 stockBefore = ammStock1.balanceOf(USER_1);
+        uint256 stableBefore = dusdToken.balanceOf(USER_1);
+
+        vm.startPrank(USER_1);
+        dusdToken.approve(address(dclexRouter), maxIn);
+        dclexRouter.buyExactOutput(
+            address(ammStock1),
+            exactOut,
+            maxIn,
+            block.timestamp + 1,
+            new bytes[](0)
+        );
+        vm.stopPrank();
+
+        assertEq(
+            ammStock1.balanceOf(USER_1) - stockBefore,
+            exactOut,
+            "exact output must still be delivered in full"
+        );
+        assertLt(
+            stableBefore - dusdToken.balanceOf(USER_1),
+            maxIn,
+            "unspent input must be refunded"
+        );
+        assertEq(
+            dusdToken.balanceOf(address(dclexRouter)),
+            0,
+            "router must not retain stablecoin"
+        );
+    }
 }

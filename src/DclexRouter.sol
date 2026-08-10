@@ -800,8 +800,6 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
                 priceUpdateData: priceUpdateData
             })
         );
-        // Defensive: V3 settles exact-output swaps at the requested amount,
-        // but guard against a malformed pool returning less.
         if (outAmount < exactOutputAmount) revert DclexRouter__NoLiquidity();
     }
 
@@ -1027,12 +1025,14 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
         address recipient,
         uint256 maxInputAmount
     ) private returns (uint256 stockUsed) {
-        (stockUsed, ) = _v3Swap(
+        uint256 stablecoinOut;
+        (stockUsed, stablecoinOut) = _v3Swap(
             -int256(stablecoinAmount),
             token,
             recipient,
             _routerCtxForV3(token, token, maxInputAmount)
         );
+        if (stablecoinOut < stablecoinAmount) revert DclexRouter__NoLiquidity();
     }
 
     function _buyExactOutputOnV3(
@@ -1041,12 +1041,14 @@ contract DclexRouter is Ownable, ReentrancyGuard, IDclexSwapCallback, IUniswapV3
         address recipient,
         uint256 maxStablecoinAmount
     ) private returns (uint256 stableUsed) {
-        (stableUsed, ) = _v3Swap(
+        uint256 tokenOut;
+        (stableUsed, tokenOut) = _v3Swap(
             -int256(tokenAmount),
             address(stablecoin),
             recipient,
             _routerCtxForV3(token, address(stablecoin), maxStablecoinAmount)
         );
+        if (tokenOut < tokenAmount) revert DclexRouter__NoLiquidity();
     }
 
     // ============ Cross-Pool ExactOutput Helper ============
