@@ -542,7 +542,10 @@ contract DeployAMMStocks is Script {
 
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddr);
         (uint160 sqrtPriceX96, , , , , uint8 feeProtocol, ) = pool.slot0();
-        if (sqrtPriceX96 == 0) {
+        bool skipInit = vm.envOr("AMMT_SKIP_INIT", false);
+        if (sqrtPriceX96 == 0 && skipInit) {
+            console.log("AMMT_SKIP_INIT=true: leaving pool uninitialized (first LP sets the price)");
+        } else if (sqrtPriceX96 == 0) {
             uint160 initSqrtPriceX96 = _calcSqrtPrice(stockToken, priceUsd);
             console.log("Initializing pool with sqrtPriceX96:", uint256(initSqrtPriceX96));
             console.log("  Expected price USD:", priceUsd / 1e6);
@@ -552,7 +555,7 @@ contract DeployAMMStocks is Script {
         }
 
         // Match DclexPool's 15% protocol-fee cut as closely as V3 allows.
-        if (feeProtocol == 0) {
+        if (feeProtocol == 0 && !(sqrtPriceX96 == 0 && skipInit)) {
             pool.setFeeProtocol(7, 7);
         }
 
