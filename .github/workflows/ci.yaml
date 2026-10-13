@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # lib/dclex-blockchain, lib/dclex-protocol and lib/v3-periphery are
       # private PrimeDeltaCorp repos, so the default GITHUB_TOKEN cannot fetch
