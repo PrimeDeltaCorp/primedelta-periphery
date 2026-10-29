@@ -34,15 +34,16 @@ contract PoolInitCodeHashTest is Test {
     ///   testnet  factory 0x28Fe900fc0Cc1749B132dCE753d5cB5bcA8cF678 -> 0xd1e22371…
     ///   retired dev factory 0x948B3c65… matches neither (a third lineage).
     ///
-    /// Pinned to the dev+mainnet value, which is also what a clean, fully recursive
-    /// checkout compiles to — so DeployV3Production's fresh-factory guard passes.
+    /// Pinned to the pool that fixes its protocol fee at 7|7 (PrimeDeltaCorp/v3-core),
+    /// which is what a clean, fully recursive checkout compiles to — so
+    /// DeployV3Production's fresh-factory guard passes. The factories above predate it.
     ///
-    /// ⚠ A periphery-only redeploy against the LIVE TESTNET factory needs
-    /// 0xd1e22371… instead; change both this constant and the literal for that run,
-    /// or redeploy the testnet factory from a clean checkout. Whatever you pin,
+    /// ⚠ A periphery-only redeploy against one of the factories above needs that
+    /// factory's hash instead; change both this constant and the literal for that run,
+    /// or redeploy the factory from a clean checkout. Whatever you pin,
     /// VerifyPoolInitCodeHashLive against the TARGET rpc is the deciding guard.
     bytes32 internal constant CANONICAL =
-        0x717e89ac27e7e09cfcb96dec0aa69bbc220b42d8efa67a75678ec232e6882fe8;
+        0x6c575a9a7db007127bc49abbe264c440708ebe4248bc2932900ebf5868e77134;
 
     function test_poolInitCodeHashIsPinnedCanonical() public pure {
         assertEq(

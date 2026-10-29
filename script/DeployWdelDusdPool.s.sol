@@ -59,7 +59,7 @@ contract DeployWdelDusdPool is Script {
         }
 
         // Initialize price if pool isn't yet primed.
-        (uint160 sqrtPriceX96, , , , , uint8 feeProtocol, ) = IUniswapV3Pool(pool).slot0();
+        (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
         if (sqrtPriceX96 == 0) {
             uint160 initSqrtPriceX96 = _calcSqrtPrice(wdel, dusd, priceUsd6);
             IUniswapV3Pool(pool).initialize(initSqrtPriceX96);
@@ -68,15 +68,8 @@ contract DeployWdelDusdPool is Script {
             console.log("Pool already initialized");
         }
 
-        // Match DclexPool's 15% protocol-fee cut as closely as Uniswap V3's
-        // discrete buckets allow. feeProtocol denominator ∈ {0, 4..10};
-        // 7 → 1/7 ≈ 14.29% per side, the closest under 15%. setFeeProtocol
-        // is onlyFactoryOwner, so this only works when broadcaster ==
-        // v3Factory.owner() (which is ADMIN here — see DeployV3Production).
-        if (feeProtocol == 0) {
-            IUniswapV3Pool(pool).setFeeProtocol(7, 7);
-            console.log("Set feeProtocol to 7|7 (~14.29%)");
-        }
+        (, , , , , uint8 feeProtocol, ) = IUniswapV3Pool(pool).slot0();
+        require(feeProtocol == 7 + (7 << 4), "feeProtocol is not 7|7");
 
         // DID for the pool address (contract type = 2)
         DigitalIdentity didContract = DigitalIdentity(did);
