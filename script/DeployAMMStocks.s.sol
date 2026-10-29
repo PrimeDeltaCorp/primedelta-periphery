@@ -172,7 +172,7 @@ contract DeployAMMStocks is Script {
         }
 
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddr);
-        (uint160 sqrtPriceX96, , , , , uint8 feeProtocol, ) = pool.slot0();
+        (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
 
         if (sqrtPriceX96 == 0) {
             // Initialize wDEL at $0.01 (1e4 in 6 decimals)
@@ -182,13 +182,8 @@ contract DeployAMMStocks is Script {
             console.log("  sqrtPriceX96:", uint256(initSqrtPriceX96));
         }
 
-        // Match DclexPool's 15% protocol-fee cut as closely as Uniswap V3
-        // allows. denominator ∈ {0, 4..10}; 7 → 1/7 ≈ 14.29% per side.
-        // onlyFactoryOwner — broadcaster must own the AMMT V3 factory.
-        if (feeProtocol == 0) {
-            pool.setFeeProtocol(7, 7);
-            console.log("Set feeProtocol to 7|7 (~14.29%) on wDEL/dUSD pool");
-        }
+        (, , , , , uint8 feeProtocol, ) = pool.slot0();
+        require(feeProtocol == 7 + (7 << 4), "feeProtocol is not 7|7");
 
         // Mint DID for pool if needed
         if (_did.balanceOf(poolAddr) == 0) {
@@ -541,7 +536,7 @@ contract DeployAMMStocks is Script {
         }
 
         IUniswapV3Pool pool = IUniswapV3Pool(poolAddr);
-        (uint160 sqrtPriceX96, , , , , uint8 feeProtocol, ) = pool.slot0();
+        (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
         bool skipInit = vm.envOr("AMMT_SKIP_INIT", false);
         if (sqrtPriceX96 == 0 && skipInit) {
             console.log("AMMT_SKIP_INIT=true: leaving pool uninitialized (first LP sets the price)");
@@ -554,9 +549,9 @@ contract DeployAMMStocks is Script {
             console.log("Pool already initialized with sqrtPriceX96:", uint256(sqrtPriceX96));
         }
 
-        // Match DclexPool's 15% protocol-fee cut as closely as V3 allows.
-        if (feeProtocol == 0 && !(sqrtPriceX96 == 0 && skipInit)) {
-            pool.setFeeProtocol(7, 7);
+        if (!(sqrtPriceX96 == 0 && skipInit)) {
+            (, , , , , uint8 feeProtocol, ) = pool.slot0();
+            require(feeProtocol == 7 + (7 << 4), "feeProtocol is not 7|7");
         }
 
         vm.stopBroadcast();
