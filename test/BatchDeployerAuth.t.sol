@@ -18,6 +18,7 @@ import {DeployDclex} from "dclex-protocol/script/DeployDclex.s.sol";
 contract BatchDeployerAuthTest is Test {
     address private authorized = makeAddr("authorized");
     address private attacker = makeAddr("attacker");
+    address private FEE_RECIPIENT = makeAddr("pool_fee_recipient");
 
     function testDeployAllPoolsRejectsUnauthorizedCaller() external {
         BatchPoolDeployer batch = new BatchPoolDeployer(authorized);
@@ -28,6 +29,7 @@ contract BatchDeployerAuthTest is Test {
             oracle: IPriceOracle(address(0)),
             stockAddresses: new address[](0),
             finalOwner: address(0),
+            feeRecipient: FEE_RECIPIENT,
             initializer: address(0xbeef)
         });
         vm.prank(attacker);
@@ -64,6 +66,7 @@ contract BatchDeployerAuthTest is Test {
             oracle: IPriceOracle(address(0)),
             stockAddresses: new address[](0),
             finalOwner: address(0),
+            feeRecipient: FEE_RECIPIENT,
             initializer: address(0xbeef)
         });
         vm.prank(authorized);
@@ -96,6 +99,7 @@ contract BatchDeployerAuthTest is Test {
             oracle: IPriceOracle(address(0xbeef)),
             stockAddresses: new address[](0),
             finalOwner: admin,
+            feeRecipient: FEE_RECIPIENT,
             initializer: address(this)
         }));
 
@@ -169,6 +173,7 @@ contract BatchDeployerAuthTest is Test {
             oracle: IPriceOracle(address(0xbeef)),
             stockAddresses: new address[](0),
             finalOwner: finalOwner,
+            feeRecipient: FEE_RECIPIENT,
             initializer: address(this)
         }));
 
@@ -219,11 +224,87 @@ contract BatchDeployerAuthTest is Test {
             oracle: IPriceOracle(address(0)),
             stockAddresses: new address[](0),
             finalOwner: makeAddr("final_owner_zi"),
+            feeRecipient: FEE_RECIPIENT,
             initializer: address(0)
         });
         vm.prank(authorized);
         vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__ZeroAddress.selector);
         batch.deployAllPools(p);
+    }
+
+    function testDeployAllPoolsRejectsZeroFeeRecipient() external {
+        BatchPoolDeployer batch = new BatchPoolDeployer(authorized);
+        BatchPoolDeployer.DeployParams memory p = BatchPoolDeployer.DeployParams({
+            router: DclexRouter(payable(address(0))),
+            factory: Factory(address(0)),
+            dusdToken: IERC20(address(0)),
+            oracle: IPriceOracle(address(0)),
+            stockAddresses: new address[](0),
+            finalOwner: makeAddr("final_owner_zf"),
+            feeRecipient: address(0),
+            initializer: address(0xbeef)
+        });
+        vm.prank(authorized);
+        vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__ZeroAddress.selector);
+        batch.deployAllPools(p);
+    }
+
+    function _deployOnePool(address recipient, bool recipientHasDid, string memory tag)
+        private
+        returns (DclexPool pool, DigitalIdentity did)
+    {
+        address master = makeAddr(string.concat("master_", tag));
+        address admin = makeAddr(string.concat("admin_", tag));
+        DeployDclex.DclexContracts memory contracts = (new DeployDclex()).run(admin, master);
+        did = contracts.digitalIdentity;
+
+        string[] memory names = new string[](1);
+        string[] memory symbols = new string[](1);
+        names[0] = "Apple";
+        symbols[0] = "AAPL";
+        vm.prank(admin);
+        contracts.stocksFactory.createStocks(names, symbols);
+        address stock = contracts.stocksFactory.stocks("AAPL");
+
+        if (recipientHasDid) {
+            vm.prank(admin);
+            did.mintAdmin(recipient, 0, bytes32(0));
+        }
+
+        USDCMock dusd = new USDCMock("dUSD", "dUSD");
+        DclexRouter router = new DclexRouter(IERC20(address(dusd)));
+        BatchPoolDeployer batch = new BatchPoolDeployer(address(this));
+        router.transferOwnership(address(batch));
+        vm.prank(master);
+        did.grantRole(0x00, address(batch));
+
+        BatchPoolDeployer.DeployParams memory p;
+        p.router = router;
+        p.factory = contracts.stocksFactory;
+        p.dusdToken = IERC20(address(dusd));
+        p.oracle = IPriceOracle(address(0xbeef));
+        p.stockAddresses = new address[](1);
+        p.stockAddresses[0] = stock;
+        p.finalOwner = admin;
+        p.feeRecipient = recipient;
+        p.initializer = makeAddr(string.concat("seeder_", tag));
+        batch.deployAllPools(p);
+        pool = DclexPool(router.stockToDclexPool(stock));
+    }
+
+    function testDeployAllPoolsSetsTheFeeRecipientAndMintsItsDid() external {
+        address recipient = makeAddr("fee_recipient_fr1");
+        (DclexPool pool, DigitalIdentity did) = _deployOnePool(recipient, false, "fr1");
+        assertEq(pool.feeRecipient(), recipient);
+        assertEq(did.balanceOf(recipient), 1, "the recipient must be able to receive stock fees");
+        assertFalse(pool.hasRole(pool.DEFAULT_ADMIN_ROLE(), recipient), "the recipient must not be the pool admin");
+    }
+
+    function testDeployAllPoolsAcceptsAFeeRecipientThatAlreadyHasADid() external {
+        address recipient = makeAddr("fee_recipient_fr2");
+        (DclexPool pool, DigitalIdentity did) = _deployOnePool(recipient, true, "fr2");
+        assertEq(pool.feeRecipient(), recipient);
+        assertEq(did.balanceOf(recipient), 1);
     }
 
     function testDeployAllPoolsGrantsTheSeedingRoleToTheNamedInitializer() external {
@@ -257,6 +338,7 @@ contract BatchDeployerAuthTest is Test {
             oracle: IPriceOracle(address(0xbeef)),
             stockAddresses: stocks,
             finalOwner: admin,
+            feeRecipient: FEE_RECIPIENT,
             initializer: seeder
         }));
 
@@ -325,8 +407,11 @@ contract BatchDeployerAuthTest is Test {
         f.oracle.setPrice(keccak256(abi.encodePacked(f.stock)), 20 ether);
 
         f.batchInit = new FIOraclePoolBatchInitializer(address(this));
+        address feeRecipient = makeAddr(string.concat("fee_recipient_", tag));
+        vm.prank(f.admin);
+        f.did.mintAdmin(feeRecipient, 0, bytes32(0));
         f.pool = new DclexPool(
-            IStock(f.stock), IERC20(address(f.dusd)), f.oracle, 0, 0, 0, f.admin, address(f.batchInit)
+            IStock(f.stock), IERC20(address(f.dusd)), f.oracle, 0, 0, 0, f.admin, feeRecipient, address(f.batchInit)
         );
 
         vm.prank(master);

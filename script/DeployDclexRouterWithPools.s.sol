@@ -107,11 +107,12 @@ contract DeployRouterWithPools is Script {
         did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
         batch.deployAllPools(BatchPoolDeployer.DeployParams(
             router, p.stocksFactory, cfg.dusdToken, cfg.oracle,
-            stocks, p.admin, p.admin
+            stocks, p.admin, cfg.feeRecipient, p.admin
         ));
         did.revokeRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
 
         vm.stopBroadcast();
+        console.log("Pool fee recipient:", cfg.feeRecipient);
         console.log("Router ownership PENDING for admin:", p.admin);
         console.log("ACTION REQUIRED: admin must acceptOwnership() on the router");
         return router;

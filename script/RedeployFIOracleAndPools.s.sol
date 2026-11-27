@@ -26,7 +26,7 @@ import {DclexStockList} from "./DclexStockList.sol";
 /// signs a fresh price and seeds all 44 pools in one quick tx.
 ///
 /// Required env: DEPLOYER_PRIVATE_KEY, ADMIN_PRIVATE_KEY, MASTER_ADMIN_PRIVATE_KEY,
-/// DCLEX_ROUTER, DCLEX_FACTORY, DCLEX_DID, DCLEX_ADMIN.
+/// DCLEX_ROUTER, DCLEX_FACTORY, DCLEX_DID, DCLEX_ADMIN, POOL_FEE_RECIPIENT.
 /// Optional env: DCLEX_DUSD_SYMBOL (defaults to "dUSD").
 /// The trusted-signer handoff happens in FinalizeFIOracleRedeploy, not here.
 contract RedeployFIOracleAndPools is DclexStockList {
@@ -34,6 +34,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
     address internal FACTORY;
     address internal DID;
     address internal ADMIN;
+    address internal POOL_FEE_RECIPIENT;
     string  internal DUSD_SYMBOL;
 
     uint256 constant INITIAL_UPDATE_FEE = 0.001 ether;
@@ -44,6 +45,8 @@ contract RedeployFIOracleAndPools is DclexStockList {
         FACTORY        = vm.envAddress("DCLEX_FACTORY");
         DID            = vm.envAddress("DCLEX_DID");
         ADMIN          = vm.envAddress("DCLEX_ADMIN");
+        POOL_FEE_RECIPIENT = vm.envAddress("POOL_FEE_RECIPIENT");
+        require(POOL_FEE_RECIPIENT != ADMIN, "POOL_FEE_RECIPIENT must differ from DCLEX_ADMIN");
         DUSD_SYMBOL    = vm.envOr("DCLEX_DUSD_SYMBOL", string("dUSD"));
     }
 
@@ -78,6 +81,9 @@ contract RedeployFIOracleAndPools is DclexStockList {
         // named as the pools' seeder at construction.
         vm.startBroadcast(adminKey);
         FIOraclePoolBatchInitializer batchInit = new FIOraclePoolBatchInitializer(ADMIN);
+        if (did.balanceOf(POOL_FEE_RECIPIENT) == 0) {
+            did.mintAdmin(POOL_FEE_RECIPIENT, 2, bytes32(0));
+        }
         vm.stopBroadcast();
 
         address[] memory newPools = new address[](stocks.length);
@@ -93,6 +99,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
                 0.0005 ether,
                 0.15 ether, // protocol-fee cut baked at deploy (#256)
                 ADMIN,
+                POOL_FEE_RECIPIENT,
                 address(batchInit)
             );
             newPools[i] = address(pool);

@@ -142,6 +142,11 @@ contract DclexRouterTest is Test, TestBalance {
         priceOracle.setPrice(USDC_PRICE_FEED_ID, 1 ether);
 
         // Deploy DclexPools
+        {
+            address poolFeeRecipient = dclexProtocolHelperConfig.getConfig().feeRecipient;
+            vm.prank(ADMIN);
+            digitalIdentity.mintAdmin(poolFeeRecipient, 0, bytes32(0));
+        }
         DeployDclexPool dclexPoolDeployer = new DeployDclexPool();
         aaplPool = dclexPoolDeployer.run(
             IStock(address(aaplStock)),

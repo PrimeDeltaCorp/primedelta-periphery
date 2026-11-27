@@ -117,6 +117,8 @@ contract Regression_AuditFixes is Test, TestBalance {
         priceOracle.setPrice(NVDA_PRICE_FEED_ID, 30 ether);
 
         // ----- Pools -----
+        vm.prank(ADMIN);
+        digitalIdentity.mintAdmin(cfg.feeRecipient, 0, bytes32(0));
         DeployDclexPool poolDeployer = new DeployDclexPool();
         aaplPool = poolDeployer.run(IStock(address(aaplStock)), helper, 0, 0, 0,
             address(this));
@@ -211,6 +213,7 @@ contract Regression_AuditFixes is Test, TestBalance {
             0,
             0,
             ADMIN,
+            address(this),
             ADMIN
         );
         // Sanity: stock side genuinely matches, so we isolate the stablecoin check.
@@ -400,6 +403,7 @@ contract Regression_AuditFixes is Test, TestBalance {
             0,
             0,
             ADMIN,
+            address(this),
             ADMIN
         );
         assertEq(address(mismatchedPool.stockToken()), address(amznStock));

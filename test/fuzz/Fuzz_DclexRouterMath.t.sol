@@ -171,6 +171,11 @@ contract Fuzz_DclexRouterMath is Test {
         // Same stock ⇒ same price feed id + same multiplier ⇒ the two pools'
         // swap math is identical once their reserves match.
         router = new DclexRouter(IERC20(address(dusd)));
+        {
+            address poolFeeRecipient = helperConfig.getConfig().feeRecipient;
+            vm.prank(ADMIN);
+            did.mintAdmin(poolFeeRecipient, 0, bytes32(0));
+        }
         DeployDclexPool poolDeployer = new DeployDclexPool();
         routerPool = poolDeployer.deploy(IStock(address(aapl)), helperConfig, 0, 0, 0,
             address(this));
