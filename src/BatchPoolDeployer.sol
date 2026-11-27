@@ -69,6 +69,9 @@ contract BatchPoolDeployer {
         if (digitalIdentity.balanceOf(params.feeRecipient) == 0) {
             digitalIdentity.mintAdmin(params.feeRecipient, 2, bytes32(0));
         }
+        if (!digitalIdentity.verifyTransfer(params.feeRecipient, params.feeRecipient)) {
+            revert BatchPoolDeployer__InvalidFeeRecipient();
+        }
 
         uint256 feeCurveA = DEFAULT_SENSITIVITY / 4;
         uint256 feeCurveB = DEFAULT_BASE_FEE_RATE - DEFAULT_SENSITIVITY;

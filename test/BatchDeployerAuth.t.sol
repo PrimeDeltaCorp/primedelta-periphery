@@ -335,6 +335,40 @@ contract BatchDeployerAuthTest is Test {
         assertFalse(did.isPro(did.getId(recipient)), "the recipient's DID must not be pro");
     }
 
+    function testDeployAllPoolsRejectsAFeeRecipientWithAnInvalidDid() external {
+        address master = makeAddr("master_fr3");
+        address admin = makeAddr("admin_fr3");
+        address recipient = makeAddr("fee_recipient_fr3");
+        DeployDclex.DclexContracts memory contracts = (new DeployDclex()).run(admin, master);
+        DigitalIdentity did = contracts.digitalIdentity;
+        vm.startPrank(admin);
+        did.mintAdmin(recipient, 0, bytes32(0));
+        uint256[] memory ids = new uint256[](1);
+        uint256[] memory valids = new uint256[](1);
+        ids[0] = did.getId(recipient);
+        valids[0] = 2;
+        did.setValids(ids, valids);
+        vm.stopPrank();
+
+        DclexRouter router = new DclexRouter(IERC20(address(0xdead)));
+        BatchPoolDeployer batch = new BatchPoolDeployer(address(this));
+        router.transferOwnership(address(batch));
+        vm.prank(master);
+        did.grantRole(0x00, address(batch));
+
+        BatchPoolDeployer.DeployParams memory p;
+        p.router = router;
+        p.factory = contracts.stocksFactory;
+        p.dusdToken = IERC20(address(0xdead));
+        p.oracle = IPriceOracle(address(0xbeef));
+        p.stockAddresses = new address[](0);
+        p.finalOwner = admin;
+        p.feeRecipient = recipient;
+        p.initializer = address(this);
+        vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__InvalidFeeRecipient.selector);
+        batch.deployAllPools(p);
+    }
+
     function testDeployAllPoolsAcceptsAFeeRecipientThatAlreadyHasADid() external {
         address recipient = makeAddr("fee_recipient_fr2");
         (DclexPool pool, DigitalIdentity did) = _deployOnePool(recipient, true, "fr2");
