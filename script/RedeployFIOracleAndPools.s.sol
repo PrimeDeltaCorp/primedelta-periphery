@@ -46,6 +46,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
         DID            = vm.envAddress("DCLEX_DID");
         ADMIN          = vm.envAddress("DCLEX_ADMIN");
         POOL_FEE_RECIPIENT = vm.envAddress("POOL_FEE_RECIPIENT");
+        require(POOL_FEE_RECIPIENT != address(0), "POOL_FEE_RECIPIENT is zero");
         require(POOL_FEE_RECIPIENT != ADMIN, "POOL_FEE_RECIPIENT must differ from DCLEX_ADMIN");
         DUSD_SYMBOL    = vm.envOr("DCLEX_DUSD_SYMBOL", string("dUSD"));
     }
@@ -57,6 +58,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
         require(vm.addr(adminKey) == ADMIN, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
         uint256 masterKey   = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
         address deployer    = vm.addr(deployerKey);
+        require(POOL_FEE_RECIPIENT != deployer, "POOL_FEE_RECIPIENT must differ from the deployer");
 
         Factory factory     = Factory(FACTORY);
         DigitalIdentity did = DigitalIdentity(DID);
@@ -85,6 +87,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
             did.mintAdmin(POOL_FEE_RECIPIENT, 2, bytes32(0));
         }
         vm.stopBroadcast();
+        require(did.verifyTransfer(POOL_FEE_RECIPIENT, POOL_FEE_RECIPIENT), "POOL_FEE_RECIPIENT has no valid DID");
 
         address[] memory newPools = new address[](stocks.length);
         vm.startBroadcast(deployerKey);

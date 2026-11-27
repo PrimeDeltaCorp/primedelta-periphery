@@ -249,6 +249,41 @@ contract BatchDeployerAuthTest is Test {
         batch.deployAllPools(p);
     }
 
+    function testDeployAllPoolsRejectsAFeeRecipientEqualToTheFinalOwner() external {
+        address owner = makeAddr("final_owner_fo");
+        BatchPoolDeployer batch = new BatchPoolDeployer(authorized);
+        BatchPoolDeployer.DeployParams memory p = BatchPoolDeployer.DeployParams({
+            router: DclexRouter(payable(address(0))),
+            factory: Factory(address(0)),
+            dusdToken: IERC20(address(0)),
+            oracle: IPriceOracle(address(0)),
+            stockAddresses: new address[](0),
+            finalOwner: owner,
+            feeRecipient: owner,
+            initializer: address(0xbeef)
+        });
+        vm.prank(authorized);
+        vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__InvalidFeeRecipient.selector);
+        batch.deployAllPools(p);
+    }
+
+    function testDeployAllPoolsRejectsTheDeployerAsFeeRecipient() external {
+        BatchPoolDeployer batch = new BatchPoolDeployer(authorized);
+        BatchPoolDeployer.DeployParams memory p = BatchPoolDeployer.DeployParams({
+            router: DclexRouter(payable(address(0))),
+            factory: Factory(address(0)),
+            dusdToken: IERC20(address(0)),
+            oracle: IPriceOracle(address(0)),
+            stockAddresses: new address[](0),
+            finalOwner: makeAddr("final_owner_dp"),
+            feeRecipient: authorized,
+            initializer: address(0xbeef)
+        });
+        vm.prank(authorized);
+        vm.expectRevert(BatchPoolDeployer.BatchPoolDeployer__InvalidFeeRecipient.selector);
+        batch.deployAllPools(p);
+    }
+
     function _deployOnePool(address recipient, bool recipientHasDid, string memory tag)
         private
         returns (DclexPool pool, DigitalIdentity did)
@@ -297,7 +332,7 @@ contract BatchDeployerAuthTest is Test {
         (DclexPool pool, DigitalIdentity did) = _deployOnePool(recipient, false, "fr1");
         assertEq(pool.feeRecipient(), recipient);
         assertEq(did.balanceOf(recipient), 1, "the recipient must be able to receive stock fees");
-        assertFalse(pool.hasRole(pool.DEFAULT_ADMIN_ROLE(), recipient), "the recipient must not be the pool admin");
+        assertFalse(did.isPro(did.getId(recipient)), "the recipient's DID must not be pro");
     }
 
     function testDeployAllPoolsAcceptsAFeeRecipientThatAlreadyHasADid() external {

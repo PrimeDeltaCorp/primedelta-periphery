@@ -141,6 +141,7 @@ contract RedeployRouterPoolsAndPM is Script {
         cfg.dusd          = vm.envAddress("DCLEX_DUSD");
         cfg.admin         = vm.envAddress("DCLEX_ADMIN");
         cfg.poolFeeRecipient = vm.envAddress("POOL_FEE_RECIPIENT");
+        require(cfg.poolFeeRecipient != address(0), "POOL_FEE_RECIPIENT is zero");
         require(cfg.poolFeeRecipient != cfg.admin, "POOL_FEE_RECIPIENT must differ from DCLEX_ADMIN");
         cfg.backendSigner = vm.envAddress("DCLEX_BACKEND_SIGNER");
         require(cfg.backendSigner != address(0), "DCLEX_BACKEND_SIGNER is zero");
@@ -172,7 +173,7 @@ contract RedeployRouterPoolsAndPM is Script {
         require(vm.addr(adminKey) == cfg.admin, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
 
         StockInfo[] memory stocks = getAllStocks();
-        _mintFeeRecipientDid(cfg, adminKey);
+        _prepareFeeRecipient(cfg, adminKey, vm.addr(deployerKey));
         Phase1Output memory ph = _phase1Deploy(cfg, deployerKey, stocks);
         _phase2Configure(ph, cfg, stocks, adminKey, masterAdminKey);
         if (vm.envOr("SKIP_INIT", false)) {
@@ -189,12 +190,18 @@ contract RedeployRouterPoolsAndPM is Script {
         _printSummary(ph, stocks);
     }
 
-    function _mintFeeRecipientDid(EnvCfg memory cfg, uint256 adminKey) internal {
+    function _prepareFeeRecipient(EnvCfg memory cfg, uint256 adminKey, address deployer) internal {
+        require(cfg.poolFeeRecipient != deployer, "POOL_FEE_RECIPIENT must differ from the deployer");
         DigitalIdentity did = DigitalIdentity(cfg.did);
-        if (did.balanceOf(cfg.poolFeeRecipient) != 0) return;
-        vm.startBroadcast(adminKey);
-        did.mintAdmin(cfg.poolFeeRecipient, 2, bytes32(0));
-        vm.stopBroadcast();
+        if (did.balanceOf(cfg.poolFeeRecipient) == 0) {
+            vm.startBroadcast(adminKey);
+            did.mintAdmin(cfg.poolFeeRecipient, 2, bytes32(0));
+            vm.stopBroadcast();
+        }
+        require(
+            did.verifyTransfer(cfg.poolFeeRecipient, cfg.poolFeeRecipient),
+            "POOL_FEE_RECIPIENT has no valid DID"
+        );
     }
 
     // ============ Phase 1 (deployer): new FIOracle, router, PM, 44 pools, batch initializer ============

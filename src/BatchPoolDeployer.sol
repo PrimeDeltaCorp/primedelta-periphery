@@ -35,6 +35,7 @@ contract BatchPoolDeployer {
 
     error BatchPoolDeployer__Unauthorized();
     error BatchPoolDeployer__ZeroAddress();
+    error BatchPoolDeployer__InvalidFeeRecipient();
 
     constructor(address _deployer) {
         if (_deployer == address(0)) revert BatchPoolDeployer__ZeroAddress();
@@ -59,6 +60,9 @@ contract BatchPoolDeployer {
         if (params.finalOwner == address(0)) revert BatchPoolDeployer__ZeroAddress();
         if (params.initializer == address(0)) revert BatchPoolDeployer__ZeroAddress();
         if (params.feeRecipient == address(0)) revert BatchPoolDeployer__ZeroAddress();
+        if (params.feeRecipient == params.finalOwner || params.feeRecipient == deployer) {
+            revert BatchPoolDeployer__InvalidFeeRecipient();
+        }
         params.router.acceptOwnership();
         DigitalIdentity digitalIdentity = DigitalIdentity(address(params.factory.getDID()));
         digitalIdentity.mintAdmin(address(params.router), 2, bytes32(0));
