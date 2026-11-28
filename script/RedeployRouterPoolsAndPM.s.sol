@@ -225,9 +225,6 @@ contract RedeployRouterPoolsAndPM is Script {
         console.log("BatchInitializer:", address(ph.batchInit));
 
         ph.router.setDclexOracle(address(ph.fiOracle));
-        // Under SKIP_INIT phase 3 never runs, so the batch initializer
-        // would hold a seeding role it can never use while the admin —
-        // who runs initialize-dclex-pools.sh later — holds none.
         ph.poolDeployer = new DclexPoolDeployer(
             ph.router,
             cfg.admin,
@@ -252,7 +249,9 @@ contract RedeployRouterPoolsAndPM is Script {
         uint256 masterAdminKey
     ) internal {
         DigitalIdentity did = DigitalIdentity(cfg.did);
+        address oldPoolDeployer = Factory(cfg.factory).getPoolDeployer();
         vm.startBroadcast(masterAdminKey);
+        if (oldPoolDeployer != address(0)) did.revokeRole(did.DEFAULT_ADMIN_ROLE(), oldPoolDeployer);
         did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(ph.poolDeployer));
         vm.stopBroadcast();
 
@@ -264,6 +263,7 @@ contract RedeployRouterPoolsAndPM is Script {
             require(stockAddr != address(0), string.concat("stock not found: ", stocks[i].symbol));
             ph.pools[i] = poolDeployer.deployPool(stockAddr);
         }
+        poolDeployer.setPoolConfig(cfg.admin, cfg.poolFeeRecipient, cfg.admin);
         poolDeployer.grantRole(poolDeployer.DEFAULT_ADMIN_ROLE(), cfg.admin);
         poolDeployer.grantRole(poolDeployer.DEFAULT_ADMIN_ROLE(), cfg.factory);
         poolDeployer.grantRole(MASTER_ADMIN_ROLE, vm.addr(masterAdminKey));

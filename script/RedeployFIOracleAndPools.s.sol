@@ -89,23 +89,31 @@ contract RedeployFIOracleAndPools is DclexStockList {
         vm.stopBroadcast();
         require(did.verifyTransfer(POOL_FEE_RECIPIENT, POOL_FEE_RECIPIENT), "POOL_FEE_RECIPIENT has no valid DID");
 
-        address[] memory stockAddrs = _dclexStocks(factory, router, stocks);
+        address[] memory stockAddrs = new address[](stocks.length);
+        for (uint256 i = 0; i < stocks.length; i++) {
+            stockAddrs[i] = factory.stocks(stocks[i].symbol);
+            require(stockAddrs[i] != address(0), string.concat("stock not found: ", stocks[i].symbol));
+        }
+        address[] memory unlisted = _unlistedDclexStocks(router, stockAddrs);
 
         // Phase 3a (admin): deregister, repoint the router's oracle pin, then
         // create and register the new pools. Registering first reverts
         // DclexRouter__OracleMismatch.
         DclexPoolDeployer poolDeployer = DclexPoolDeployer(POOL_DEPLOYER);
+        require(address(poolDeployer.router()) == DCLEX_ROUTER, "DCLEX_POOL_DEPLOYER serves another router");
+        address[] memory registered = router.allStockTokens();
         vm.startBroadcast(adminKey);
         did.mintAdmin(address(batchInit), 2, bytes32(0));
-        for (uint256 i = 0; i < stockAddrs.length; i++) {
-            if (router.getPoolType(stockAddrs[i]) == DclexRouter.PoolType.DCLEX) {
-                router.removePool(stockAddrs[i], DclexRouter.PoolType.DCLEX);
+        for (uint256 i = 0; i < registered.length; i++) {
+            if (router.getPoolType(registered[i]) == DclexRouter.PoolType.DCLEX) {
+                router.removePool(registered[i], DclexRouter.PoolType.DCLEX);
             }
         }
         router.setDclexOracle(address(fiOracle));
         poolDeployer.setPoolConfig(ADMIN, POOL_FEE_RECIPIENT, address(batchInit));
         address[] memory newPools = poolDeployer.deployPools(stockAddrs);
         poolDeployer.setPoolConfig(ADMIN, POOL_FEE_RECIPIENT, ADMIN);
+        poolDeployer.deployPools(unlisted);
         factory.forceMintStablecoin(DUSD_SYMBOL, address(batchInit), DUSD_AMOUNT * stocks.length);
         vm.stopBroadcast();
 
@@ -126,29 +134,23 @@ contract RedeployFIOracleAndPools is DclexStockList {
         console.log("Deploy done. Run SeedDclexPoolsBatch.s.sol to seed + hand off FIOracle.");
     }
 
-    function _dclexStocks(
-        Factory factory,
+    function _unlistedDclexStocks(
         DclexRouter router,
-        StockInfo[] memory stocks
-    ) internal view returns (address[] memory stockAddrs) {
+        address[] memory listed
+    ) internal view returns (address[] memory unlisted) {
         address[] memory registered = router.allStockTokens();
-        stockAddrs = new address[](stocks.length + registered.length);
+        unlisted = new address[](registered.length);
         uint256 n;
-        for (uint256 i = 0; i < stocks.length; i++) {
-            stockAddrs[n] = factory.stocks(stocks[i].symbol);
-            require(stockAddrs[n] != address(0), string.concat("stock not found: ", stocks[i].symbol));
-            n++;
-        }
         for (uint256 i = 0; i < registered.length; i++) {
             if (router.getPoolType(registered[i]) != DclexRouter.PoolType.DCLEX) continue;
-            bool listed;
-            for (uint256 j = 0; j < stocks.length; j++) {
-                if (stockAddrs[j] == registered[i]) listed = true;
+            bool isListed;
+            for (uint256 j = 0; j < listed.length; j++) {
+                if (listed[j] == registered[i]) isListed = true;
             }
-            if (!listed) stockAddrs[n++] = registered[i];
+            if (!isListed) unlisted[n++] = registered[i];
         }
         assembly {
-            mstore(stockAddrs, n)
+            mstore(unlisted, n)
         }
     }
 }

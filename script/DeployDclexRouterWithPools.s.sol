@@ -67,6 +67,9 @@ contract DeployRouterWithPools is Script {
         DigitalIdentity did = DigitalIdentity(address(stocksFactory.getDID()));
         uint256 adminKey = vm.envUint("ADMIN_PRIVATE_KEY");
         uint256 masterKey = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
+        require(vm.addr(adminKey) == admin, "ADMIN_PRIVATE_KEY != admin");
+        require(cfg.feeRecipient != vm.addr(masterKey), "POOL_FEE_RECIPIENT must differ from the master");
+        address oldPoolDeployer = stocksFactory.getPoolDeployer();
 
         vm.startBroadcast(adminKey);
         if (did.balanceOf(cfg.feeRecipient) == 0) {
@@ -79,6 +82,7 @@ contract DeployRouterWithPools is Script {
         router.setDclexOracle(address(cfg.oracle));
         DclexPoolDeployer poolDeployer = new DclexPoolDeployer(router, admin, cfg.feeRecipient, admin);
         router.setPoolRegistrar(address(poolDeployer));
+        if (oldPoolDeployer != address(0)) did.revokeRole(did.DEFAULT_ADMIN_ROLE(), oldPoolDeployer);
         did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(poolDeployer));
         poolDeployer.deployPools(stocks);
         poolDeployer.grantRole(poolDeployer.DEFAULT_ADMIN_ROLE(), admin);
