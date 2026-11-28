@@ -24,7 +24,7 @@ import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
 ///
 /// Env required:
 ///   DEPLOYER_PRIVATE_KEY, ADMIN_PRIVATE_KEY, MASTER_ADMIN_PRIVATE_KEY
-///   DCLEX_FACTORY, DCLEX_DID, DCLEX_DUSD, DCLEX_ADMIN, DCLEX_BACKEND_SIGNER
+///   DCLEX_FACTORY, DCLEX_DID, DCLEX_DUSD, DCLEX_ADMIN, DCLEX_BACKEND_SIGNER, POOL_FEE_RECIPIENT
 ///   DCLEX_FIORACLE_SIGNER (optional — defaults to DCLEX_BACKEND_SIGNER)
 ///   V3_FACTORY, V3_WDEL, V3_DESCRIPTOR
 ///   AMMT1_STOCK, AMMT1_V3_POOL, AMMT2_STOCK, AMMT2_V3_POOL, WDEL_V3_POOL
@@ -50,6 +50,7 @@ contract RedeployRouterPoolsAndPM is Script {
         address did;
         address dusd;
         address admin;
+        address poolFeeRecipient;
         address backendSigner;   // Factory/DID/Vault admin — signs vouchers
         address fiOracleSigner;  // FIOracle trustedSigner — signs prices ONLY
         address v3Factory;
@@ -139,6 +140,9 @@ contract RedeployRouterPoolsAndPM is Script {
         cfg.did           = vm.envAddress("DCLEX_DID");
         cfg.dusd          = vm.envAddress("DCLEX_DUSD");
         cfg.admin         = vm.envAddress("DCLEX_ADMIN");
+        cfg.poolFeeRecipient = vm.envAddress("POOL_FEE_RECIPIENT");
+        require(cfg.poolFeeRecipient != address(0), "POOL_FEE_RECIPIENT is zero");
+        require(cfg.poolFeeRecipient != cfg.admin, "POOL_FEE_RECIPIENT must differ from DCLEX_ADMIN");
         cfg.backendSigner = vm.envAddress("DCLEX_BACKEND_SIGNER");
         require(cfg.backendSigner != address(0), "DCLEX_BACKEND_SIGNER is zero");
         // Optional dedicated FIOracle price signer; defaults to the backend
@@ -169,6 +173,7 @@ contract RedeployRouterPoolsAndPM is Script {
         require(vm.addr(adminKey) == cfg.admin, "ADMIN_PRIVATE_KEY != DCLEX_ADMIN");
 
         StockInfo[] memory stocks = getAllStocks();
+        _prepareFeeRecipient(cfg, adminKey, vm.addr(deployerKey));
         Phase1Output memory ph = _phase1Deploy(cfg, deployerKey, stocks);
         _phase2Configure(ph, cfg, stocks, adminKey, masterAdminKey);
         if (vm.envOr("SKIP_INIT", false)) {
@@ -183,6 +188,20 @@ contract RedeployRouterPoolsAndPM is Script {
             _phase4HandoffOracle(ph, cfg, deployerKey);
         }
         _printSummary(ph, stocks);
+    }
+
+    function _prepareFeeRecipient(EnvCfg memory cfg, uint256 adminKey, address deployer) internal {
+        require(cfg.poolFeeRecipient != deployer, "POOL_FEE_RECIPIENT must differ from the deployer");
+        DigitalIdentity did = DigitalIdentity(cfg.did);
+        if (did.balanceOf(cfg.poolFeeRecipient) == 0) {
+            vm.startBroadcast(adminKey);
+            did.mintAdmin(cfg.poolFeeRecipient, 2, bytes32(0));
+            vm.stopBroadcast();
+        }
+        require(
+            did.verifyTransfer(cfg.poolFeeRecipient, cfg.poolFeeRecipient),
+            "POOL_FEE_RECIPIENT has no valid DID"
+        );
     }
 
     // ============ Phase 1 (deployer): new FIOracle, router, PM, 44 pools, batch initializer ============
@@ -234,6 +253,7 @@ contract RedeployRouterPoolsAndPM is Script {
                 DEFAULT_FEE_CURVE_B,
                 DEFAULT_PROTOCOL_FEE_RATE,
                 cfg.admin,
+                cfg.poolFeeRecipient,
                 // Under SKIP_INIT phase 3 never runs, so the batch initializer
                 // would hold a seeding role it can never use while the admin —
                 // who runs initialize-dclex-pools.sh later — holds none.

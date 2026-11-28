@@ -139,6 +139,11 @@ contract DclexRouterAMMTest is Test, IUniswapV3MintCallback {
         priceOracle.setPrice(usdcPriceFeedId, 1 ether);
 
         // Deploy custom pool for AAPL
+        {
+            address poolFeeRecipient = dclexProtocolHelperConfig.getConfig().feeRecipient;
+            vm.prank(ADMIN);
+            digitalIdentity.mintAdmin(poolFeeRecipient, 0, bytes32(0));
+        }
         DeployDclexPool dclexPoolDeployer = new DeployDclexPool();
         aaplPool = dclexPoolDeployer.run(
             IStock(address(aaplStock)),

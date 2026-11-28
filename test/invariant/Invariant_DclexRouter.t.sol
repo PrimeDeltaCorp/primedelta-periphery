@@ -403,6 +403,11 @@ contract Invariant_DclexRouter is StdInvariant, Test {
         // ---- router + fee-free DCLEX pools (exactly the unit-harness setup) ----
         router = new DclexRouter(IERC20(address(dusd)));
 
+        {
+            address poolFeeRecipient = helperConfig.getConfig().feeRecipient;
+            vm.prank(ADMIN);
+            did.mintAdmin(poolFeeRecipient, 0, bytes32(0));
+        }
         DeployDclexPool poolDeployer = new DeployDclexPool();
         aaplPool = poolDeployer.run(IStock(address(aaplStock)), helperConfig, 0, 0, 0,
             address(this));

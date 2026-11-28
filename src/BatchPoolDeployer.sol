@@ -35,6 +35,7 @@ contract BatchPoolDeployer {
 
     error BatchPoolDeployer__Unauthorized();
     error BatchPoolDeployer__ZeroAddress();
+    error BatchPoolDeployer__InvalidFeeRecipient();
 
     constructor(address _deployer) {
         if (_deployer == address(0)) revert BatchPoolDeployer__ZeroAddress();
@@ -48,6 +49,7 @@ contract BatchPoolDeployer {
         IPriceOracle oracle;
         address[] stockAddresses;
         address finalOwner;
+        address feeRecipient;
         /// @dev Holds INITIALIZER_ROLE on every pool this call deploys. Seeding
         ///      happens in a later phase, so this is not necessarily the caller.
         address initializer;
@@ -57,9 +59,19 @@ contract BatchPoolDeployer {
         if (msg.sender != deployer) revert BatchPoolDeployer__Unauthorized();
         if (params.finalOwner == address(0)) revert BatchPoolDeployer__ZeroAddress();
         if (params.initializer == address(0)) revert BatchPoolDeployer__ZeroAddress();
+        if (params.feeRecipient == address(0)) revert BatchPoolDeployer__ZeroAddress();
+        if (params.feeRecipient == params.finalOwner || params.feeRecipient == deployer) {
+            revert BatchPoolDeployer__InvalidFeeRecipient();
+        }
         params.router.acceptOwnership();
         DigitalIdentity digitalIdentity = DigitalIdentity(address(params.factory.getDID()));
         digitalIdentity.mintAdmin(address(params.router), 2, bytes32(0));
+        if (digitalIdentity.balanceOf(params.feeRecipient) == 0) {
+            digitalIdentity.mintAdmin(params.feeRecipient, 2, bytes32(0));
+        }
+        if (!digitalIdentity.verifyTransfer(params.feeRecipient, params.feeRecipient)) {
+            revert BatchPoolDeployer__InvalidFeeRecipient();
+        }
 
         uint256 feeCurveA = DEFAULT_SENSITIVITY / 4;
         uint256 feeCurveB = DEFAULT_BASE_FEE_RATE - DEFAULT_SENSITIVITY;
@@ -75,6 +87,7 @@ contract BatchPoolDeployer {
                 feeCurveB,
                 DEFAULT_PROTOCOL_FEE_RATE,
                 params.finalOwner,
+                params.feeRecipient,
                 params.initializer
             );
 
