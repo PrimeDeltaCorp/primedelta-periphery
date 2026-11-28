@@ -5,14 +5,13 @@ import {Script, console} from "forge-std/Script.sol";
 import {Factory} from "dclex-blockchain/contracts/dclex/Factory.sol";
 import {DigitalIdentity} from "dclex-blockchain/contracts/dclex/DigitalIdentity.sol";
 import {IDID} from "dclex-blockchain/contracts/interfaces/IDID.sol";
-import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
-import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
-import {IPriceOracle} from "dclex-protocol/src/IPriceOracle.sol";
 import {FIOracle} from "dclex-protocol/src/FIOracle.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DclexRouter} from "src/DclexRouter.sol";
 import {DclexPositionManager} from "src/DclexPositionManager.sol";
 import {FIOraclePoolBatchInitializer} from "src/FIOraclePoolBatchInitializer.sol";
+import {DclexPoolDeployer} from "src/DclexPoolDeployer.sol";
+import {MASTER_ADMIN_ROLE} from "dclex-blockchain/contracts/libs/Model.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {PoolAddress} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 import {UniswapV3Pool} from "@uniswap/v3-core/contracts/UniswapV3Pool.sol";
@@ -35,11 +34,6 @@ contract RedeployRouterPoolsAndPM is Script {
     uint256 constant STOCK_AMOUNT        = 10e18;
     uint256 constant DUSD_AMOUNT         = 1_000e6;
     uint24  constant V3_FEE_TIER         = 3000;
-    uint256 constant DEFAULT_FEE_CURVE_A = 0.0005 ether;
-    uint256 constant DEFAULT_FEE_CURVE_B = 0.0005 ether;
-    // Protocol-fee cut baked at deploy (dclex-infrastructure#256). Matches
-    // BatchPoolDeployer.DEFAULT_PROTOCOL_FEE_RATE — keep in sync.
-    uint256 constant DEFAULT_PROTOCOL_FEE_RATE = 0.15 ether;
 
     struct StockInfo {
         string symbol;
@@ -68,6 +62,7 @@ contract RedeployRouterPoolsAndPM is Script {
         DclexRouter router;
         DclexPositionManager npm;
         FIOraclePoolBatchInitializer batchInit;
+        DclexPoolDeployer poolDeployer;
         address[] pools;
     }
 
@@ -175,6 +170,7 @@ contract RedeployRouterPoolsAndPM is Script {
         StockInfo[] memory stocks = getAllStocks();
         _prepareFeeRecipient(cfg, adminKey, vm.addr(deployerKey));
         Phase1Output memory ph = _phase1Deploy(cfg, deployerKey, stocks);
+        _deployPools(ph, cfg, stocks, deployerKey, masterAdminKey);
         _phase2Configure(ph, cfg, stocks, adminKey, masterAdminKey);
         if (vm.envOr("SKIP_INIT", false)) {
             // Slow/flaky RPCs stretch the gap between price signing and tx
@@ -204,7 +200,7 @@ contract RedeployRouterPoolsAndPM is Script {
         );
     }
 
-    // ============ Phase 1 (deployer): new FIOracle, router, PM, 44 pools, batch initializer ============
+    // ============ Phase 1 (deployer): new FIOracle, router, PM, batch initializer, pool deployer ============
     function _phase1Deploy(
         EnvCfg memory cfg,
         uint256 deployerKey,
@@ -228,7 +224,15 @@ contract RedeployRouterPoolsAndPM is Script {
         ph.batchInit = new FIOraclePoolBatchInitializer(cfg.admin);
         console.log("BatchInitializer:", address(ph.batchInit));
 
-        _deployPools(ph, cfg, stocks);
+        ph.router.setDclexOracle(address(ph.fiOracle));
+        ph.poolDeployer = new DclexPoolDeployer(
+            ph.router,
+            cfg.admin,
+            cfg.poolFeeRecipient,
+            vm.envOr("SKIP_INIT", false) ? cfg.admin : address(ph.batchInit)
+        );
+        ph.router.setPoolRegistrar(address(ph.poolDeployer));
+        console.log("DclexPoolDeployer:", address(ph.poolDeployer));
 
         // Hand router ownership to admin. Ownable2Step: this only sets
         // pendingOwner; _phase2Configure claims it as its first admin call.
@@ -240,27 +244,32 @@ contract RedeployRouterPoolsAndPM is Script {
     function _deployPools(
         Phase1Output memory ph,
         EnvCfg memory cfg,
-        StockInfo[] memory stocks
+        StockInfo[] memory stocks,
+        uint256 deployerKey,
+        uint256 masterAdminKey
     ) internal {
+        DigitalIdentity did = DigitalIdentity(cfg.did);
+        address oldPoolDeployer = Factory(cfg.factory).getPoolDeployer();
+        vm.startBroadcast(masterAdminKey);
+        if (oldPoolDeployer != address(0)) did.revokeRole(did.DEFAULT_ADMIN_ROLE(), oldPoolDeployer);
+        did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(ph.poolDeployer));
+        vm.stopBroadcast();
+
+        DclexPoolDeployer poolDeployer = ph.poolDeployer;
+        ph.pools = new address[](stocks.length);
+        vm.startBroadcast(deployerKey);
         for (uint256 i = 0; i < stocks.length; i++) {
             address stockAddr = Factory(cfg.factory).stocks(stocks[i].symbol);
             require(stockAddr != address(0), string.concat("stock not found: ", stocks[i].symbol));
-            DclexPool pool = new DclexPool(
-                IStock(stockAddr),
-                IERC20(cfg.dusd),
-                IPriceOracle(address(ph.fiOracle)),
-                DEFAULT_FEE_CURVE_A,
-                DEFAULT_FEE_CURVE_B,
-                DEFAULT_PROTOCOL_FEE_RATE,
-                cfg.admin,
-                cfg.poolFeeRecipient,
-                // Under SKIP_INIT phase 3 never runs, so the batch initializer
-                // would hold a seeding role it can never use while the admin —
-                // who runs initialize-dclex-pools.sh later — holds none.
-                vm.envOr("SKIP_INIT", false) ? cfg.admin : address(ph.batchInit)
-            );
-            ph.pools[i] = address(pool);
+            ph.pools[i] = poolDeployer.deployPool(stockAddr);
         }
+        poolDeployer.setPoolConfig(cfg.admin, cfg.poolFeeRecipient, cfg.admin);
+        poolDeployer.grantRole(poolDeployer.DEFAULT_ADMIN_ROLE(), cfg.admin);
+        poolDeployer.grantRole(poolDeployer.DEFAULT_ADMIN_ROLE(), cfg.factory);
+        poolDeployer.grantRole(MASTER_ADMIN_ROLE, vm.addr(masterAdminKey));
+        poolDeployer.renounceRole(poolDeployer.DEFAULT_ADMIN_ROLE(), vm.addr(deployerKey));
+        poolDeployer.renounceRole(MASTER_ADMIN_ROLE, vm.addr(deployerKey));
+        vm.stopBroadcast();
     }
 
     // ============ Phase 2 (admin): DIDs, pool wiring, V3 pool registry, fund batch initializer ============
@@ -283,14 +292,7 @@ contract RedeployRouterPoolsAndPM is Script {
         did.mintAdmin(address(ph.router), 2, bytes32(0));
         did.mintAdmin(address(ph.npm), 2, bytes32(0));
         did.mintAdmin(address(ph.batchInit), 2, bytes32(0));
-
-        for (uint256 i = 0; i < stocks.length; i++) {
-            did.mintAdmin(ph.pools[i], 2, bytes32(0));
-        }
-        for (uint256 i = 0; i < stocks.length; i++) {
-            address stockAddr = factory.stocks(stocks[i].symbol);
-            ph.router.addPool(stockAddr, DclexRouter.PoolType.DCLEX, ph.pools[i], 0);
-        }
+        factory.setPoolDeployer(address(ph.poolDeployer));
 
         // V3 pools (AMMT1, AMMT2, WDEL). AMMT tokens are added manually
         // post-deploy on testnet/prod — skip registration when env vars
