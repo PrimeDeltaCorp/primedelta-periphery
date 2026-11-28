@@ -99,7 +99,11 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
 
     uint256 public dclexPoolCount;
 
+    address public poolRegistrar;
+
     event DclexOracleSet(address indexed oracle);
+
+    event PoolRegistrarSet(address indexed poolRegistrar);
 
     event PoolSetForToken(
         address indexed token,
@@ -111,6 +115,8 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
     error DclexRouter__InvalidFeeTier();
     error DclexRouter__NativeTransferFailed();
     error DclexRouter__PoolMismatch();
+    error DclexRouter__NotPoolRegistrar();
+    error DclexRouter__PoolAlreadyRegistered();
 
     constructor(IERC20 _stablecoin) Ownable(msg.sender) {
         if (address(_stablecoin) == address(0)) revert DclexRouter__ZeroAddress();
@@ -233,38 +239,7 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
 
         if (poolType == PoolType.DCLEX) {
             if (feeTier != 0) revert DclexRouter__FeeTierNotAllowedForType();
-            if (pool.code.length == 0) revert DclexRouter__PoolMismatch();
-            try DclexPool(pool).stockToken() returns (IStock st) {
-                if (address(st) != token) revert DclexRouter__PoolMismatch();
-            } catch {
-                revert DclexRouter__PoolMismatch();
-            }
-            try DclexPool(pool).stablecoinToken() returns (IERC20 sc) {
-                if (address(sc) != address(stablecoin)) {
-                    revert DclexRouter__PoolMismatch();
-                }
-            } catch {
-                revert DclexRouter__PoolMismatch();
-            }
-            address poolOracle;
-            try DclexPool(pool).oracle() returns (IPriceOracle o) {
-                poolOracle = address(o);
-            } catch {
-                revert DclexRouter__PoolMismatch();
-            }
-            if (poolOracle == address(0)) revert DclexRouter__PoolMismatch();
-            if (dclexOracle == address(0)) {
-                dclexOracle = poolOracle;
-                emit DclexOracleSet(poolOracle);
-            } else if (poolOracle != dclexOracle) {
-                revert DclexRouter__OracleMismatch();
-            }
-            _clearStockRegistry(token);
-            stockPoolType[token] = PoolType.DCLEX;
-            stockToDclexPool[token] = DclexPool(pool);
-            dclexPoolCount++;
-            _addToStockTokens(token);
-            emit PoolSetForToken(token, pool, PoolType.DCLEX);
+            _registerDclexPool(token, pool);
         } else if (poolType == PoolType.V3) {
             if (feeTier != 500 && feeTier != 3000 && feeTier != 10000) {
                 revert DclexRouter__InvalidFeeTier();
@@ -290,6 +265,52 @@ contract DclexRouter is Ownable2Step, ReentrancyGuard, IDclexSwapCallback, IUnis
             // "treat unknown type as V3" outcome.
             revert DclexRouter__InvalidPoolType();
         }
+    }
+
+    function setPoolRegistrar(address newPoolRegistrar) external onlyOwner {
+        poolRegistrar = newPoolRegistrar;
+        emit PoolRegistrarSet(newPoolRegistrar);
+    }
+
+    function registerDclexPool(address token, address pool) external {
+        if (msg.sender != poolRegistrar) revert DclexRouter__NotPoolRegistrar();
+        if (stockPoolType[token] != PoolType.NONE) revert DclexRouter__PoolAlreadyRegistered();
+        _registerDclexPool(token, pool);
+    }
+
+    function _registerDclexPool(address token, address pool) private {
+        if (pool.code.length == 0) revert DclexRouter__PoolMismatch();
+        try DclexPool(pool).stockToken() returns (IStock st) {
+            if (address(st) != token) revert DclexRouter__PoolMismatch();
+        } catch {
+            revert DclexRouter__PoolMismatch();
+        }
+        try DclexPool(pool).stablecoinToken() returns (IERC20 sc) {
+            if (address(sc) != address(stablecoin)) {
+                revert DclexRouter__PoolMismatch();
+            }
+        } catch {
+            revert DclexRouter__PoolMismatch();
+        }
+        address poolOracle;
+        try DclexPool(pool).oracle() returns (IPriceOracle o) {
+            poolOracle = address(o);
+        } catch {
+            revert DclexRouter__PoolMismatch();
+        }
+        if (poolOracle == address(0)) revert DclexRouter__PoolMismatch();
+        if (dclexOracle == address(0)) {
+            dclexOracle = poolOracle;
+            emit DclexOracleSet(poolOracle);
+        } else if (poolOracle != dclexOracle) {
+            revert DclexRouter__OracleMismatch();
+        }
+        _clearStockRegistry(token);
+        stockPoolType[token] = PoolType.DCLEX;
+        stockToDclexPool[token] = DclexPool(pool);
+        dclexPoolCount++;
+        _addToStockTokens(token);
+        emit PoolSetForToken(token, pool, PoolType.DCLEX);
     }
 
     /// @notice Remove `token`'s currently-registered pool.

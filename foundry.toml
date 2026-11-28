@@ -7,15 +7,30 @@ libs = ["lib"]
 evm_version = "cancun"
 via_ir = false
 optimizer_runs = 200
+auto_detect_remappings = false
 remappings = [
+    "@dclex-protocol/=lib/dclex-protocol/src/",
+    "@ensdomains/=lib/dclex-blockchain/lib/v4-periphery/lib/v4-core/node_modules/@ensdomains/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@pythnetwork/pyth-sdk-solidity/=lib/dclex-blockchain/node_modules/@pythnetwork/pyth-sdk-solidity/",
     "@uniswap/v3-core/=lib/v3-core/",
     "@uniswap/v3-periphery/=lib/v3-periphery/",
-    "@dclex-protocol/=lib/dclex-protocol/src/",
-    "dclex-protocol/=lib/dclex-protocol/",
-    "dclex-blockchain/=lib/dclex-blockchain/",
-    "@openzeppelin/=lib/openzeppelin-contracts/",
-    "forge-std/=lib/forge-std/src/",
     "base64-sol/=lib/base64/",
+    "base64/=lib/base64/",
+    "dclex-blockchain/=lib/dclex-blockchain/",
+    "dclex-protocol/=lib/dclex-protocol/",
+    "ds-test/=lib/dclex-blockchain/lib/v4-periphery/lib/v4-core/lib/forge-std/lib/ds-test/src/",
+    "erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/",
+    "eth-gas-reporter/=lib/dclex-blockchain/node_modules/eth-gas-reporter/",
+    "forge-gas-snapshot/=lib/dclex-blockchain/lib/v4-periphery/lib/v4-core/lib/forge-gas-snapshot/src/",
+    "forge-std/=lib/forge-std/src/",
+    "halmos-cheatcodes/=lib/openzeppelin-contracts/lib/halmos-cheatcodes/src/",
+    "hardhat/=lib/dclex-blockchain/node_modules/hardhat/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/",
+    "permit2/=lib/dclex-blockchain/lib/v4-periphery/lib/permit2/",
+    "solmate/=lib/dclex-blockchain/lib/v4-periphery/lib/v4-core/lib/solmate/",
+    "v3-core/=lib/v3-core/contracts/",
+    "v3-periphery/=lib/v3-periphery/contracts/",
 ]
 fs_permissions = [{ access = "read-write", path = "./out" }]
 extra_output = ["storageLayout"]
@@ -35,16 +50,6 @@ libs = ["lib"]
 evm_version = "cancun"
 via_ir = false
 optimizer_runs = 200
-remappings = [
-    "@uniswap/v3-core/=lib/v3-core/",
-    "@uniswap/v3-periphery/=lib/v3-periphery/",
-    "@dclex-protocol/=lib/dclex-protocol/src/",
-    "dclex-protocol/=lib/dclex-protocol/",
-    "dclex-blockchain/=lib/dclex-blockchain/",
-    "@openzeppelin/=lib/openzeppelin-contracts/",
-    "forge-std/=lib/forge-std/src/",
-    "base64-sol/=lib/base64/",
-]
 skip = [
     "src/DclexRouter.sol",
     "script/HelperConfig.s.sol",
@@ -61,16 +66,6 @@ libs = ["lib"]
 evm_version = "cancun"
 via_ir = false
 optimizer_runs = 200
-remappings = [
-    "@uniswap/v3-core/=lib/v3-core/",
-    "@uniswap/v3-periphery/=lib/v3-periphery/",
-    "@dclex-protocol/=lib/dclex-protocol/src/",
-    "dclex-protocol/=lib/dclex-protocol/",
-    "dclex-blockchain/=lib/dclex-blockchain/",
-    "@openzeppelin/=lib/openzeppelin-contracts/",
-    "forge-std/=lib/forge-std/src/",
-    "base64-sol/=lib/base64/",
-]
 skip = [
     "script/HelperConfig.s.sol",
     "script/InitializePool.s.sol",

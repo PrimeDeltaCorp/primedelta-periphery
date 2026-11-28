@@ -4,12 +4,10 @@ pragma solidity ^0.8.26;
 import {console} from "forge-std/Script.sol";
 import {Factory} from "dclex-blockchain/contracts/dclex/Factory.sol";
 import {DigitalIdentity} from "dclex-blockchain/contracts/dclex/DigitalIdentity.sol";
-import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
-import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
-import {IPriceOracle} from "dclex-protocol/src/IPriceOracle.sol";
 import {FIOracle} from "dclex-protocol/src/FIOracle.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DclexRouter} from "src/DclexRouter.sol";
+import {DclexPoolDeployer} from "src/DclexPoolDeployer.sol";
 import {FIOraclePoolBatchInitializer} from "src/FIOraclePoolBatchInitializer.sol";
 import {DclexStockList} from "./DclexStockList.sol";
 
@@ -26,11 +24,12 @@ import {DclexStockList} from "./DclexStockList.sol";
 /// signs a fresh price and seeds all 44 pools in one quick tx.
 ///
 /// Required env: DEPLOYER_PRIVATE_KEY, ADMIN_PRIVATE_KEY, MASTER_ADMIN_PRIVATE_KEY,
-/// DCLEX_ROUTER, DCLEX_FACTORY, DCLEX_DID, DCLEX_ADMIN, POOL_FEE_RECIPIENT.
+/// DCLEX_ROUTER, DCLEX_POOL_DEPLOYER, DCLEX_FACTORY, DCLEX_DID, DCLEX_ADMIN, POOL_FEE_RECIPIENT.
 /// Optional env: DCLEX_DUSD_SYMBOL (defaults to "dUSD").
 /// The trusted-signer handoff happens in FinalizeFIOracleRedeploy, not here.
 contract RedeployFIOracleAndPools is DclexStockList {
     address payable internal DCLEX_ROUTER;
+    address internal POOL_DEPLOYER;
     address internal FACTORY;
     address internal DID;
     address internal ADMIN;
@@ -42,6 +41,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
 
     function _loadEnv() internal {
         DCLEX_ROUTER   = payable(vm.envAddress("DCLEX_ROUTER"));
+        POOL_DEPLOYER  = vm.envAddress("DCLEX_POOL_DEPLOYER");
         FACTORY        = vm.envAddress("DCLEX_FACTORY");
         DID            = vm.envAddress("DCLEX_DID");
         ADMIN          = vm.envAddress("DCLEX_ADMIN");
@@ -89,46 +89,27 @@ contract RedeployFIOracleAndPools is DclexStockList {
         vm.stopBroadcast();
         require(did.verifyTransfer(POOL_FEE_RECIPIENT, POOL_FEE_RECIPIENT), "POOL_FEE_RECIPIENT has no valid DID");
 
-        address[] memory newPools = new address[](stocks.length);
-        vm.startBroadcast(deployerKey);
+        address[] memory stockAddrs = new address[](stocks.length);
         for (uint256 i = 0; i < stocks.length; i++) {
-            address stockAddr = factory.stocks(stocks[i].symbol);
-            require(stockAddr != address(0), string.concat("stock not found: ", stocks[i].symbol));
-            DclexPool pool = new DclexPool(
-                IStock(stockAddr),
-                dusdToken,
-                IPriceOracle(address(fiOracle)),
-                0.0005 ether,
-                0.0005 ether,
-                0.15 ether, // protocol-fee cut baked at deploy (#256)
-                ADMIN,
-                POOL_FEE_RECIPIENT,
-                address(batchInit)
-            );
-            newPools[i] = address(pool);
+            stockAddrs[i] = factory.stocks(stocks[i].symbol);
+            require(stockAddrs[i] != address(0), string.concat("stock not found: ", stocks[i].symbol));
         }
-        vm.stopBroadcast();
 
-        // Phase 3a (admin): deploy batch initializer, mint DIDs for it and
-        // each new pool, route stock→newPool, fund the initializer with dUSD.
+        // Phase 3a (admin): deregister, repoint the router's oracle pin, then
+        // create and register the new pools. Registering first reverts
+        // DclexRouter__OracleMismatch.
+        DclexPoolDeployer poolDeployer = DclexPoolDeployer(POOL_DEPLOYER);
         vm.startBroadcast(adminKey);
         did.mintAdmin(address(batchInit), 2, bytes32(0));
-        for (uint256 i = 0; i < stocks.length; i++) {
-            did.mintAdmin(newPools[i], 2, bytes32(0));
-        }
-        // Deregister, repoint the router's oracle pin, then re-register.
-        // Registering first reverts DclexRouter__OracleMismatch.
-        for (uint256 i = 0; i < stocks.length; i++) {
-            address stockAddr = factory.stocks(stocks[i].symbol);
-            if (router.getPoolType(stockAddr) == DclexRouter.PoolType.DCLEX) {
-                router.removePool(stockAddr, DclexRouter.PoolType.DCLEX);
+        for (uint256 i = 0; i < stockAddrs.length; i++) {
+            if (router.getPoolType(stockAddrs[i]) == DclexRouter.PoolType.DCLEX) {
+                router.removePool(stockAddrs[i], DclexRouter.PoolType.DCLEX);
             }
         }
         router.setDclexOracle(address(fiOracle));
-        for (uint256 i = 0; i < stocks.length; i++) {
-            address stockAddr = factory.stocks(stocks[i].symbol);
-            router.addPool(stockAddr, DclexRouter.PoolType.DCLEX, newPools[i], 0);
-        }
+        poolDeployer.setPoolConfig(ADMIN, POOL_FEE_RECIPIENT, address(batchInit));
+        address[] memory newPools = poolDeployer.deployPools(stockAddrs);
+        poolDeployer.setPoolConfig(ADMIN, POOL_FEE_RECIPIENT, ADMIN);
         factory.forceMintStablecoin(DUSD_SYMBOL, address(batchInit), DUSD_AMOUNT * stocks.length);
         vm.stopBroadcast();
 

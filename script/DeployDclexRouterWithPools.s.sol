@@ -2,8 +2,6 @@
 pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
-import {IStock} from "dclex-blockchain/contracts/interfaces/IStock.sol";
-import {DclexPool} from "dclex-protocol/src/DclexPool.sol";
 import {
     HelperConfig as DclexProtocolHelperConfig
 } from "dclex-protocol/script/HelperConfig.s.sol";
@@ -12,9 +10,8 @@ import {
     DigitalIdentity
 } from "dclex-blockchain/contracts/dclex/DigitalIdentity.sol";
 import {DclexRouter} from "src/DclexRouter.sol";
-import {BatchPoolDeployer} from "src/BatchPoolDeployer.sol";
+import {DclexPoolDeployer} from "src/DclexPoolDeployer.sol";
 import {HelperConfig as DclexPeripheryHelperConfig} from "./HelperConfig.s.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DeployRouterWithPools is Script {
     struct DeploymentResult {
@@ -58,64 +55,46 @@ contract DeployRouterWithPools is Script {
         result.config = result.peripheryHelperConfig.getConfig(protocolConfig.dusdToken);
         result.oracleAddress = address(protocolConfig.oracle);
 
-        result.router = _deployRouterAndPoolsViaBatchContract(
-            stocksFactory,
-            result.protocolHelperConfig,
-            result.config.dusdToken,
-            result.config.admin
-        );
+        result.router = _deployRouterAndPools(stocksFactory, protocolConfig, result.config.admin);
     }
 
-    /// @notice Deploy router and all pools via batch contract (single tx for all pools)
-    /// @dev Uses temporary permission delegation to enable single-transaction deployment
-    struct BatchDeployParams {
-        Factory stocksFactory;
-        DclexProtocolHelperConfig protocolHelperConfig;
-        IERC20 dusdToken;
-        address admin;
-    }
-
-    function _deployRouterAndPoolsViaBatchContract(
+    function _deployRouterAndPools(
         Factory stocksFactory,
-        DclexProtocolHelperConfig protocolHelperConfig,
-        IERC20 dusdToken,
+        DclexProtocolHelperConfig.NetworkConfig memory cfg,
         address admin
-    ) private returns (DclexRouter) {
-        return _executeBatchDeploy(BatchDeployParams(
-            stocksFactory, protocolHelperConfig, dusdToken, admin
-        ));
-    }
-
-    function _executeBatchDeploy(BatchDeployParams memory p) private returns (DclexRouter) {
-        DclexProtocolHelperConfig.NetworkConfig memory cfg = p.protocolHelperConfig.getConfig();
-        address[] memory stocks = _collectStockData(p.stocksFactory);
-
-        // BatchPoolDeployer.deployAllPools is locked to an immutable deployer.
-        // It must be the EOA that actually broadcasts the call — derive it
-        // from the master key (also the only account allowed to grantRole on
-        // DID) rather than msg.sender, which can diverge from the broadcaster.
+    ) private returns (DclexRouter router) {
+        address[] memory stocks = _collectStockData(stocksFactory);
+        DigitalIdentity did = DigitalIdentity(address(stocksFactory.getDID()));
+        uint256 adminKey = vm.envUint("ADMIN_PRIVATE_KEY");
         uint256 masterKey = vm.envUint("MASTER_ADMIN_PRIVATE_KEY");
-        address deployerEOA = vm.addr(masterKey);
+
+        vm.startBroadcast(adminKey);
+        if (did.balanceOf(cfg.feeRecipient) == 0) {
+            did.mintAdmin(cfg.feeRecipient, 2, bytes32(0));
+        }
+        vm.stopBroadcast();
 
         vm.startBroadcast(masterKey);
-
-        DclexRouter router = new DclexRouter(p.dusdToken);
-        BatchPoolDeployer batch = new BatchPoolDeployer(deployerEOA);
-        DigitalIdentity did = DigitalIdentity(address(p.stocksFactory.getDID()));
-
-        router.transferOwnership(address(batch));
-        did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
-        batch.deployAllPools(BatchPoolDeployer.DeployParams(
-            router, p.stocksFactory, cfg.dusdToken, cfg.oracle,
-            stocks, p.admin, cfg.feeRecipient, p.admin
-        ));
-        did.revokeRole(did.DEFAULT_ADMIN_ROLE(), address(batch));
-
+        router = new DclexRouter(cfg.dusdToken);
+        router.setDclexOracle(address(cfg.oracle));
+        DclexPoolDeployer poolDeployer = new DclexPoolDeployer(router, admin, cfg.feeRecipient, admin);
+        router.setPoolRegistrar(address(poolDeployer));
+        did.grantRole(did.DEFAULT_ADMIN_ROLE(), address(poolDeployer));
+        poolDeployer.deployPools(stocks);
+        poolDeployer.grantRole(poolDeployer.DEFAULT_ADMIN_ROLE(), admin);
+        poolDeployer.grantRole(poolDeployer.DEFAULT_ADMIN_ROLE(), address(stocksFactory));
+        poolDeployer.renounceRole(poolDeployer.DEFAULT_ADMIN_ROLE(), vm.addr(masterKey));
+        router.transferOwnership(admin);
         vm.stopBroadcast();
+
+        vm.startBroadcast(adminKey);
+        did.mintAdmin(address(router), 2, bytes32(0));
+        stocksFactory.setPoolDeployer(address(poolDeployer));
+        vm.stopBroadcast();
+
+        console.log("DclexPoolDeployer:", address(poolDeployer));
         console.log("Pool fee recipient:", cfg.feeRecipient);
-        console.log("Router ownership PENDING for admin:", p.admin);
         console.log("ACTION REQUIRED: admin must acceptOwnership() on the router");
-        return router;
     }
 
     function _collectStockData(
