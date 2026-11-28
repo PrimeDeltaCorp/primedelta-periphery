@@ -89,11 +89,7 @@ contract RedeployFIOracleAndPools is DclexStockList {
         vm.stopBroadcast();
         require(did.verifyTransfer(POOL_FEE_RECIPIENT, POOL_FEE_RECIPIENT), "POOL_FEE_RECIPIENT has no valid DID");
 
-        address[] memory stockAddrs = new address[](stocks.length);
-        for (uint256 i = 0; i < stocks.length; i++) {
-            stockAddrs[i] = factory.stocks(stocks[i].symbol);
-            require(stockAddrs[i] != address(0), string.concat("stock not found: ", stocks[i].symbol));
-        }
+        address[] memory stockAddrs = _dclexStocks(factory, router, stocks);
 
         // Phase 3a (admin): deregister, repoint the router's oracle pin, then
         // create and register the new pools. Registering first reverts
@@ -128,5 +124,31 @@ contract RedeployFIOracleAndPools is DclexStockList {
         console.log("New FIOracle:", address(fiOracle));
         console.log("BatchInitializer:", address(batchInit));
         console.log("Deploy done. Run SeedDclexPoolsBatch.s.sol to seed + hand off FIOracle.");
+    }
+
+    function _dclexStocks(
+        Factory factory,
+        DclexRouter router,
+        StockInfo[] memory stocks
+    ) internal view returns (address[] memory stockAddrs) {
+        address[] memory registered = router.allStockTokens();
+        stockAddrs = new address[](stocks.length + registered.length);
+        uint256 n;
+        for (uint256 i = 0; i < stocks.length; i++) {
+            stockAddrs[n] = factory.stocks(stocks[i].symbol);
+            require(stockAddrs[n] != address(0), string.concat("stock not found: ", stocks[i].symbol));
+            n++;
+        }
+        for (uint256 i = 0; i < registered.length; i++) {
+            if (router.getPoolType(registered[i]) != DclexRouter.PoolType.DCLEX) continue;
+            bool listed;
+            for (uint256 j = 0; j < stocks.length; j++) {
+                if (stockAddrs[j] == registered[i]) listed = true;
+            }
+            if (!listed) stockAddrs[n++] = registered[i];
+        }
+        assembly {
+            mstore(stockAddrs, n)
+        }
     }
 }
